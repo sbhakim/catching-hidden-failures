@@ -1,0 +1,152 @@
+{
+  "ollama:qwen2.5:7b": {
+    "full": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 2.869565217391304,
+      "mean_edit_distance": 2.869565217391304,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.8043478260869565
+    },
+    "no_prereq_missing": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 1.8695652173913044,
+      "mean_edit_distance": 1.8695652173913044,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.9347826086956522
+    },
+    "no_unknown_course": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 2.869565217391304,
+      "mean_edit_distance": 2.869565217391304,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.8043478260869565
+    },
+    "no_duplicate_of_completed": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 2.869565217391304,
+      "mean_edit_distance": 2.869565217391304,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.8043478260869565
+    },
+    "no_program_requirement_unmet": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 2.739130434782609,
+      "mean_edit_distance": 2.739130434782609,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.8478260869565217
+    },
+    "no_credit_cap_exceeded": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 2.869565217391304,
+      "mean_edit_distance": 2.869565217391304,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.8043478260869565
+    }
+  },
+  "hf:mistral-7b-instruct-v0.3": {
+    "full": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 9.108695652173912,
+      "mean_edit_distance": 9.108695652173912,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.6521739130434783
+    },
+    "no_prereq_missing": {
+      "n": 46,
+      "flagged_rate": 0.9782608695652174,
+      "mean_violations_per_plan": 8.391304347826088,
+      "mean_edit_distance": 8.391304347826088,
+      "repair_attempted": 45,
+      "repair_success_rate": 0.8222222222222222
+    },
+    "no_unknown_course": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 9.108695652173912,
+      "mean_edit_distance": 9.108695652173912,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.6304347826086957
+    },
+    "no_duplicate_of_completed": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 9.065217391304348,
+      "mean_edit_distance": 9.043478260869565,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.6521739130434783
+    },
+    "no_program_requirement_unmet": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 8.847826086956522,
+      "mean_edit_distance": 8.847826086956522,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.6739130434782609
+    },
+    "no_credit_cap_exceeded": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 9.108695652173912,
+      "mean_edit_distance": 9.108695652173912,
+      "repair_attempted": 46,
+      "repair_success_rate": 0.6304347826086957
+    }
+  },
+  "hf:gemma-2-9b-it": {
+    "full": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 3.760869565217391,
+      "mean_edit_distance": 3.717391304347826,
+      "repair_attempted": 44,
+      "repair_success_rate": 0.6590909090909091
+    },
+    "no_prereq_missing": {
+      "n": 46,
+      "flagged_rate": 0.9565217391304348,
+      "mean_violations_per_plan": 2.9782608695652173,
+      "mean_edit_distance": 2.9347826086956523,
+      "repair_attempted": 42,
+      "repair_success_rate": 0.8809523809523809
+    },
+    "no_unknown_course": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 3.739130434782609,
+      "mean_edit_distance": 3.6956521739130435,
+      "repair_attempted": 44,
+      "repair_success_rate": 0.6590909090909091
+    },
+    "no_duplicate_of_completed": {
+      "n": 46,
+      "flagged_rate": 0.9782608695652174,
+      "mean_violations_per_plan": 3.652173913043478,
+      "mean_edit_distance": 3.608695652173913,
+      "repair_attempted": 43,
+      "repair_success_rate": 0.6744186046511628
+    },
+    "no_program_requirement_unmet": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 3.739130434782609,
+      "mean_edit_distance": 3.6956521739130435,
+      "repair_attempted": 44,
+      "repair_success_rate": 0.6590909090909091
+    },
+    "no_credit_cap_exceeded": {
+      "n": 46,
+      "flagged_rate": 1.0,
+      "mean_violations_per_plan": 3.760869565217391,
+      "mean_edit_distance": 3.717391304347826,
+      "repair_attempted": 44,
+      "repair_success_rate": 0.6590909090909091
+    }
+  }
+}

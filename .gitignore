@@ -1,0 +1,116 @@
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+.installed.cfg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.python-version
+pip-log.txt
+pip-wheel-metadata/
+
+# ── Virtual envs ─────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.conda/
+conda-env/
+
+# ── Secrets / local config (never push these) ────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+id_rsa*
+id_dsa*
+*credentials*
+*secrets*
+secret_*
+
+# ── Editor / OS ──────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.#*
+\#*\#
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Notebooks ────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ── Build / dist ─────────────────────────────────────────────────
+build/
+dist/
+
+# ── Logs / runtime ───────────────────────────────────────────────
+*.log
+*.pid
+nohup.out
+
+# ── Model weights / caches (never commit — they're huge) ─────────
+*.bin
+*.safetensors
+*.gguf
+*.ckpt
+*.pt
+*.pth
+*.h5
+*.onnx
+.cache/
+huggingface/
+transformers_cache/
+hf_cache/
+models/
+ollama_cache/
+
+# ── Database dumps / local data ──────────────────────────────────
+*.dump
+*.sql.gz
+*.sql.bz2
+*.sqlite
+*.sqlite3
+*.db
+
+# ── Backups / merge artifacts ────────────────────────────────────
+*.bak
+*.orig
+*.rej
+*.tmp
+
+# ── Project-specific: keep only frozen evaluation snapshots ──────
+# The 3 *_full.jsonl files in evaluation/runs/ and evaluation/audited/
+# are committed and reproduce Table 1. Any other output left behind
+# by smoke / test / scratch runs should NOT be pushed.
+evaluation/runs/*_test.jsonl
+evaluation/runs/*_smoke.jsonl
+evaluation/runs/*_scratch*.jsonl
+evaluation/audited/*_test.jsonl
+evaluation/audited/*_smoke.jsonl
+evaluation/audited/*_scratch*.jsonl
+
+# Compiled LaTeX (in case the manuscript gets pulled into this tree)
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
+*.out
+*.bbl
+*.blg

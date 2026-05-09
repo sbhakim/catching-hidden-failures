@@ -1,0 +1,16 @@
+# Audit-layer dependencies (FastAPI service + evaluation LLM clients).
+# Install into a fresh Python 3.10+ env:
+#   conda create -n nesy python=3.10 -y && conda activate nesy
+#   pip install -r requirements.txt
+
+fastapi==0.110.3
+uvicorn[standard]==0.30.0
+httpx
+python-multipart
+pyyaml
+psycopg2-binary==2.9.9
+
+# LLM client SDKs for evaluation/run_llm.py (optional — only needed for the
+# specific provider you evaluate against)
+anthropic
+openai

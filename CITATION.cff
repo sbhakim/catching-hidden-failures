@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software or its accompanying paper, please cite as below."
+title: "Catching Hidden Failures: Post-Generation Symbolic Verification and Repair of Large Language Model Academic Advising Plans"
+authors:
+  - family-names: "Hakim"
+    given-names: "Safayat Bin"
+    affiliation: "University of Maryland, Baltimore County"
+    email: "shkaim3@umbc.edu"
+  - family-names: "Song"
+    given-names: "Houbing Herbert"
+    affiliation: "University of Maryland, Baltimore County"
+    email: "songh@umbc.edu"
+license: MIT
+repository-code: "https://github.com/<user>/NeSy-Advising-Agent"
+keywords:
+  - neuro-symbolic AI
+  - large language models
+  - academic advising
+  - verification
+  - repair
+  - degree planning
+preferred-citation:
+  type: conference-paper
+  title: "Catching Hidden Failures: Post-Generation Symbolic Verification and Repair of Large Language Model Academic Advising Plans"
+  authors:
+    - family-names: "Hakim"
+      given-names: "Safayat Bin"
+    - family-names: "Song"
+      given-names: "Houbing Herbert"
+  year: 2026
