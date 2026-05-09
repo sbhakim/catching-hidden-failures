@@ -5,6 +5,12 @@ academic advising plan and returns (i) a verdict over five constraint families p
 structural empty-plan guard, (ii) a Prolog-grounded explanation of any violation, and
 (iii) a verifier-checked, minimum-edit repaired plan.
 
+![Worked example: a generated advising plan, the audit-layer verdict with a Prolog proof, and the verifier-checked repaired plan.](docs/figures/audit_example.png)
+
+*A worked example: a Qwen2.5-7B advising plan with a missing-prereq and a
+duplicate course (left), the audit layer's typed verdict and SWI-Prolog
+proof (middle), and the verifier-checked repaired plan (right).*
+
 The repository contains the audit layer, the SWI-Prolog knowledge base, the 46-query
 adversarial benchmark, the three frozen evaluation snapshots used in Table 1, and the
 leave-one-out verifier ablation (Table 3).
