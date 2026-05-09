@@ -233,9 +233,9 @@ the prerequisite-chain explanations, and the repaired plan with its edit list.
 ## Contact
 
 For questions or follow-ups, reach out at
-<code>safayat&#x200b;&#46;b&#x200b;&#46;hakim&#x200b;&#64;&#x200b;gmail&#x200b;&#46;com</code>
-(written as `safayat [dot] b [dot] hakim [at] gmail [dot] com` to deter
-scrapers).
+**`safayat`** ‹dot› **`b`** ‹dot› **`hakim`** ‹at› **`gmail`** ‹dot› **`com`**
+(replace each ‹dot› with `.` and ‹at› with `@`; written this way to deter
+automated scrapers).
 
 ## License
 
