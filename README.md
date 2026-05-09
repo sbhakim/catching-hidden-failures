@@ -232,6 +232,7 @@ the prerequisite-chain explanations, and the repaired plan with its edit list.
 
 ## Contact
 
+For questions or follow-ups, reach out at
 **`safayat`** ‹dot› **`b`** ‹dot› **`hakim`** ‹at› **`gmail`** ‹dot› **`com`**
 
 ## License
