@@ -71,6 +71,13 @@ without re-querying the LLMs.
 │   ├── run_services.sh          # bring up the FastAPI audit service
 │   └── smoke_test.py            # synthetic-plan exercise of the layer (no LLM)
 │
+├── tests/                       # offline pytest suite (no swipl/Postgres needed)
+│   ├── test_audit_layer.py      # parser, models, structural verifier guard
+│   ├── test_repair.py           # repair-engine dispatch + non-mutation
+│   ├── test_explainer.py        # per-violation-kind formatting + chain rendering
+│   ├── test_snapshot.py         # end-to-end canary regression (auto-skips w/o infra)
+│   └── fixtures/canary_audit.json
+│
 ├── docs/design_notes.md
 ├── .env.example
 ├── requirements.txt
