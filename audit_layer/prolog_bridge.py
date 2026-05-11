@@ -10,6 +10,7 @@ startup; an embedded session via pyswip is a v2 optimization.
 """
 from __future__ import annotations
 import os, re, subprocess
+from functools import lru_cache
 from pathlib import Path
 
 PROLOG_KB_DIR = Path(__file__).resolve().parent.parent / "prolog_kb"
@@ -60,13 +61,33 @@ def run_prolog(goal: str, *, capture_trace: bool = False,
         wrapped = f"(leash(-all), trace, ({goal}), notrace)"
     else:
         wrapped = goal
-    proc = subprocess.run(
-        ["swipl", "-q", "-s", str(RULES_LOADER), "-g", wrapped, "-t", "halt"],
-        cwd=str(PROLOG_KB_DIR),
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    cmd = ["swipl", "-q", "-s", str(RULES_LOADER), "-g", wrapped, "-t", "halt"]
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(PROLOG_KB_DIR),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except FileNotFoundError as e:
+        # Config error: swipl is not installed or not on PATH. Raised as
+        # RuntimeError (NOT PrologError) so the graceful-degradation catches
+        # in is_eligible/in_program do not silently swallow it -- a missing
+        # swipl means every plan would falsely look uneligible.
+        raise RuntimeError(
+            "SWI-Prolog (`swipl`) is required by the audit layer but was not "
+            "found on PATH. Install it with `sudo apt install swi-prolog` "
+            "(Ubuntu) or `brew install swi-prolog` (macOS), or set the PATH "
+            "to point at an existing installation."
+        ) from e
+    except subprocess.TimeoutExpired as e:
+        # The 30-s timeout is generous for any well-formed prereq query.
+        # Hitting it usually means a malformed goal or a degenerate rule
+        # file. Surface the goal so the caller can reproduce it manually.
+        raise RuntimeError(
+            f"swipl query exceeded the 30-s timeout. Goal was:\n  {wrapped}"
+        ) from e
     stdout, stderr = proc.stdout.strip(), proc.stderr.strip()
     if strict and (proc.returncode != 0 or "ERROR:" in stderr):
         raise PrologError(stderr or stdout or f"swipl exited {proc.returncode}")
@@ -82,17 +103,51 @@ def consult_program(prog_atom: str) -> str:
     return f"consult('{path}'), "
 
 
-def prereqs_of(course: str, program: str | None = None) -> list[str]:
-    """Return immediate hard prereqs and unsatisfied alternative options."""
-    atom = norm_course(course)
-    consult = consult_program(norm_prog(program)) if program else ""
+# Process-level LRU caches over the three Prolog queries. The curriculum
+# rule files and the catalog do not change during a process lifetime, so
+# (normalized) arguments uniquely determine the result. `is_eligible`
+# caches on a frozenset of the taken-courses set, because Prolog
+# memberchk semantics are order-independent. Use `clear_cache()` to
+# invalidate (e.g. between per-test cases or after rule-file edits).
+
+
+@lru_cache(maxsize=4096)
+def _prereqs_of_cached(atom: str, prog_atom: str) -> tuple[str, ...]:
+    consult = consult_program(prog_atom) if prog_atom else ""
     out, _ = run_prolog(
         f"({consult}"
         f" findall(P,user:prerequisite({atom},P),Hard),"
         f" findall(A,(user:one_of_prereqs_fact({atom},Opts),member(A,Opts)),Alts),"
         f" append(Hard,Alts,L),sort(L,S),format('~q',[S]))"
     )
-    return [denorm_course(a) for a in atoms_from_list_literal(out)]
+    return tuple(denorm_course(a) for a in atoms_from_list_literal(out))
+
+
+def prereqs_of(course: str, program: str | None = None) -> list[str]:
+    """Return immediate hard prereqs and unsatisfied alternative options."""
+    return list(_prereqs_of_cached(
+        norm_course(course),
+        norm_prog(program) if program else "",
+    ))
+
+
+@lru_cache(maxsize=8192)
+def _is_eligible_cached(taken: frozenset, target: str, prog_atom: str) -> bool:
+    consult = consult_program(prog_atom) if prog_atom else ""
+    taken_lit = "[" + ",".join(sorted(taken)) + "]"
+    goal = (
+        f"({consult}"
+        f" (forall(user:prerequisite({target},P),memberchk(P,{taken_lit})),"
+        f"  forall(user:one_of_prereqs_fact({target},Opts),"
+        f"         (member(Alt,Opts),memberchk(Alt,{taken_lit}))),"
+        f"  forall(user:corequisite({target},Co),memberchk(Co,{taken_lit}))"
+        f"  -> write(yes); write(no)))"
+    )
+    try:
+        out, _ = run_prolog(goal)
+    except PrologError:
+        return False
+    return out.strip() == "yes"
 
 
 def is_eligible(taken: list[str], target: str, program: str | None = None) -> bool:
@@ -103,21 +158,23 @@ def is_eligible(taken: list[str], target: str, program: str | None = None) -> bo
     a yes/no decision, not a witness, so this is both faster and easier to
     parse. Three conjuncts are required to hold simultaneously: every hard
     prereq satisfied, at least one alternative for each `one_of_prereqs_fact`
-    satisfied, and every corequisite satisfied.
+    satisfied, and every corequisite satisfied. Cached on the *set* of taken
+    courses so re-queries against the same student profile reuse the result.
     """
-    consult = consult_program(norm_prog(program)) if program else ""
-    taken_lit = "[" + ",".join(norm_course(c) for c in taken) + "]"
-    tgt = norm_course(target)
-    goal = (
-        f"({consult}"
-        f" (forall(user:prerequisite({tgt},P),memberchk(P,{taken_lit})),"
-        f"  forall(user:one_of_prereqs_fact({tgt},Opts),"
-        f"         (member(Alt,Opts),memberchk(Alt,{taken_lit}))),"
-        f"  forall(user:corequisite({tgt},Co),memberchk(Co,{taken_lit}))"
-        f"  -> write(yes); write(no)))"
+    return _is_eligible_cached(
+        frozenset(norm_course(c) for c in taken),
+        norm_course(target),
+        norm_prog(program) if program else "",
     )
+
+
+@lru_cache(maxsize=2048)
+def _in_program_cached(atom: str, prog_atom: str) -> bool:
+    consult = consult_program(prog_atom)
     try:
-        out, _ = run_prolog(goal)
+        out, _ = run_prolog(
+            f"({consult} (validator_rules:in_program({atom}) -> write(yes); write(no)))"
+        )
     except PrologError:
         return False
     return out.strip() == "yes"
@@ -127,12 +184,12 @@ def in_program(course: str, program: str | None = None) -> bool:
     """Whether a course appears in the consulted program flowchart rules."""
     if not program:
         return True
-    consult = consult_program(norm_prog(program))
-    tgt = norm_course(course)
-    try:
-        out, _ = run_prolog(
-            f"({consult} (validator_rules:in_program({tgt}) -> write(yes); write(no)))"
-        )
-    except PrologError:
-        return False
-    return out.strip() == "yes"
+    return _in_program_cached(norm_course(course), norm_prog(program))
+
+
+def clear_cache() -> None:
+    """Reset all LRU caches in this module. Useful for tests that need
+    per-test isolation, or after rule-file edits in a long-running service."""
+    _prereqs_of_cached.cache_clear()
+    _is_eligible_cached.cache_clear()
+    _in_program_cached.cache_clear()
