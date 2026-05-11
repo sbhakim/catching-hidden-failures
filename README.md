@@ -254,9 +254,7 @@ MIT &mdash; see [`LICENSE`](LICENSE).
 
 ## Provenance
 
-The program-flowchart rule files under `prolog_kb/flowchart_rules/` and
-the underlying curriculum schema in `db/schema.sql` are reused, unchanged,
-from prior curriculum-grounded advising work
+Original to this work: the audit layer (`audit_layer/`, `evaluation/`,
+`tests/`, scripts). Reused as input: the curriculum schema and
+program-flowchart rules in `prolog_kb/`
 ([Quincoso&nbsp;Lugones et&nbsp;al., SAC&nbsp;'26](https://arxiv.org/abs/2602.17999)).
-The audit-layer code (`audit_layer/`, `evaluation/`, `tests/`, scripts) is
-original to this work.
