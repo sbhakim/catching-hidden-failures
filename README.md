@@ -35,54 +35,17 @@ without re-querying the LLMs.
 
 ```
 .
-├── audit_layer/                 # core contribution (~830 LOC Python)
-│   ├── models.py                # Pydantic types: Plan, Violation, AuditResult
-│   ├── plan_parser.py           # LLM output (markdown / JSON / free text) -> Plan
-│   ├── prolog_bridge.py         # subprocess shell to SWI-Prolog
-│   ├── db.py                    # Postgres helpers (catalog, completed credits)
-│   ├── verifier.py              # 5 constraint families + empty-plan guard
-│   ├── explainer.py             # prerequisite-chain explanations from the proof tree
-│   ├── repair.py                # greedy minimum-edit repair (re-verified)
-│   └── api.py                   # FastAPI: POST /audit, POST /parse
-│
-├── prolog_kb/                   # symbolic KB (program rules + course catalog)
-│   ├── rules_loader.pl
-│   ├── validator_rules.pl
-│   ├── planner_rules.pl
-│   ├── course_titles.pl
-│   └── flowchart_rules/         # 12 hand-written program rule files
-│
-├── db/
-│   ├── schema.sql               # Postgres schema for the curriculum DB
-│   └── db_config.py
-│
-├── evaluation/
-│   ├── queries.yaml             # 46-query adversarial benchmark
-│   ├── run_llm.py               # collect raw plans from a given LLM
-│   ├── run_audit.py             # apply the audit layer to runs/*.jsonl
-│   ├── compute_metrics.py       # Table 1 numbers (+ optional --by_tag breakdown)
-│   ├── run_ablations.py         # Table 3 leave-one-out verifier ablation
-│   ├── runs/                    # frozen raw LLM outputs (3 models)
-│   ├── audited/                 # frozen audited plans (3 models) — Table 1 source
-│   └── metrics/                 # snapshots referenced by the paper
-│
-├── scripts/
-│   ├── run_full_eval.sh         # one-command reproduction (idempotent)
-│   ├── run_services.sh          # bring up the FastAPI audit service
-│   └── smoke_test.py            # synthetic-plan exercise of the layer (no LLM)
-│
-├── tests/                       # offline pytest suite (no swipl/Postgres needed)
-│   ├── test_audit_layer.py      # parser, models, structural verifier guard
-│   ├── test_repair.py           # repair-engine dispatch + non-mutation
-│   ├── test_explainer.py        # per-violation-kind formatting + chain rendering
-│   ├── test_snapshot.py         # end-to-end canary regression (auto-skips w/o infra)
-│   └── fixtures/canary_audit.json
-│
+├── audit_layer/        # core contribution: parser, verifier, explainer, repair, API
+├── prolog_kb/          # symbolic KB: program rules + course catalog (see README)
+├── db/                 # Postgres schema and connection helpers
+├── evaluation/         # benchmark queries, runners, metrics, frozen JSONL snapshots
+├── scripts/            # one-command reproduction, service bring-up, smoke test
+├── tests/              # offline pytest suite + end-to-end snapshot regression
 ├── docs/design_notes.md
 ├── .env.example
 ├── requirements.txt
 ├── CITATION.cff
-└── LICENSE                       # MIT
+└── LICENSE             # MIT
 ```
 
 ---
@@ -98,7 +61,7 @@ without re-querying the LLMs.
 | (optional) HuggingFace Transformers | 4.40+ | for `hf:` LLM backends |
 
 The codebase is Linux-only by default (the SWI-Prolog subprocess is invoked via POSIX
-shell). It has been tested on Ubuntu 24.04 with an NVIDIA RTX&nbsp;3090.
+shell).
 
 ---
 
@@ -198,8 +161,7 @@ ollama serve &
 ```
 
 For HuggingFace backends (`hf:mistral-7b-instruct-v0.3`, `hf:gemma-2-9b-it`), the model
-weights are downloaded by `evaluation/run_llm.py` on first use; expect ~30 GB of disk
-and a CUDA-capable GPU with ≥16 GB VRAM.
+weights are downloaded by `evaluation/run_llm.py` on first use; expect ~30 GB of disk.
 
 ---
 
