@@ -2,15 +2,21 @@
 # Install into a fresh Python 3.10+ env:
 #   conda create -n nesy python=3.10 -y && conda activate nesy
 #   pip install -r requirements.txt
+#
+# Pinning policy: every package is bracketed by the versions we have
+# actually tested (lower bound) and the next major release (upper bound).
+# This keeps the frozen evaluation snapshots reproducible while still
+# accepting security patches. Bump the upper bound after testing.
 
 fastapi==0.110.3
 uvicorn[standard]==0.30.0
-httpx
-python-multipart
-pyyaml
-psycopg2-binary==2.9.9
+pydantic>=2.5,<3
+httpx>=0.27,<0.30
+python-multipart>=0.0.20,<0.1
+pyyaml>=6.0,<7
+psycopg2-binary>=2.9,<3
 
 # LLM client SDKs for evaluation/run_llm.py (optional — only needed for the
 # specific provider you evaluate against)
-anthropic
-openai
+anthropic>=0.40,<1
+openai>=1.50,<2
