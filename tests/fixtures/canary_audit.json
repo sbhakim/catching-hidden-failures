@@ -1,0 +1,41 @@
+{
+  "compliant_after_repair": false,
+  "n_explanations": 3,
+  "n_violations": 3,
+  "repair_ops": [
+    [
+      "remove",
+      "COP_3530"
+    ],
+    [
+      "remove",
+      "COP_9999"
+    ],
+    [
+      "remove",
+      "MAD_2104"
+    ]
+  ],
+  "residual_kinds": [
+    "no_plan_extracted"
+  ],
+  "violation_kinds": [
+    "duplicate_of_completed",
+    "prereq_missing",
+    "unknown_course"
+  ],
+  "violations_by_course": [
+    [
+      "duplicate_of_completed",
+      "MAD_2104"
+    ],
+    [
+      "prereq_missing",
+      "COP_3530"
+    ],
+    [
+      "unknown_course",
+      "COP_9999"
+    ]
+  ]
+}
