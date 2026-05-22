@@ -1,17 +1,36 @@
 # Audit-Layer evaluation queries.
 #
-# Adversarial advising benchmark used in the paper. Mix of in-scope
-# planning prompts and edge cases (out-of-scope programs, ambiguous
-# semesters, transfers, double majors) chosen to surface plan-level
-# failure modes that response-similarity metrics miss.
+# Advising benchmark.
+#
+# Two versions live in this file:
+#   - v1 (paper snapshot, 46 queries): the suite reported in Table 1
+#     and Table 3 of the paper. Audited JSONLs in evaluation/audited/
+#     cover exactly these 46 records and reproduce bit-for-bit. The v1
+#     entries appear first, ordered by category section header.
+#   - v2 routine extension (15 queries): appended at the end of the
+#     file under the "ROUTINE v2 EXTENSION" banner. These are NOT in
+#     the locked snapshots; running `run_llm.py` regenerates plans for
+#     all 61 queries.
+#
+# Counts:
+#   v1     : 20 routine + 26 adversarial probes = 46 queries
+#   v1+v2  : 35 routine + 26 adversarial probes = 61 queries
 #
 # Each entry has:
 #   id              — stable identifier
 #   user_id         — student in our seeded DB
 #   query           — natural-language prompt to give the LLM
-#   tags            — for slicing results (short_term, long_term, skill,
-#                     out_of_scope, ambiguous, transfer, double_major,
-#                     conflict, unknown_course)
+#   tags            — free-form labels for slicing (legacy)
+#   category        — canonical taxonomy label. One of:
+#                       routine-short-term, routine-long-term,
+#                       routine-skill-aligned, routine-explain,
+#                       routine-fresh-student,
+#                       probe-ambiguous-code, probe-unknown-course,
+#                       probe-prereq-violation, probe-credit-overload,
+#                       probe-transfer-credit, probe-multi-program,
+#                       probe-out-of-scope, probe-conflict,
+#                       probe-what-if, probe-optimization
+#                     See `taxonomy.md` for full definitions.
 #   expected_kind   — what the LLM should produce (single_term | roadmap |
 #                     refusal | clarification)
 #
@@ -25,30 +44,35 @@ queries:
     user_id: 4942915      # CS-BS, 4 courses done
     query: "What courses should I take next semester for my CS major?"
     tags: [short_term]
+    category: routine-short-term
     expected_kind: single_term
 
   - id: ist_02
     user_id: 4942915
     query: "Suggest 5 courses for Fall 2026 with a 15-credit cap."
     tags: [short_term]
+    category: routine-short-term
     expected_kind: single_term
 
   - id: ist_03
     user_id: 4942915
     query: "I want to focus on machine learning — what classes should I take next?"
     tags: [short_term, skill]
+    category: routine-short-term
     expected_kind: single_term
 
   - id: ist_04
     user_id: 6564893      # CS-BS-SDD, 3 done
     query: "What should I take in Spring 2027?"
     tags: [short_term]
+    category: routine-short-term
     expected_kind: single_term
 
   - id: ist_05
     user_id: 7689039      # MS-CS, 56 done
     query: "Recommend electives I can finish in one semester."
     tags: [short_term]
+    category: routine-short-term
     expected_kind: single_term
 
   # ───── in-scope long-term roadmaps ─────
@@ -56,30 +80,35 @@ queries:
     user_id: 4942915
     query: "Build me a degree plan to finish my CS BS as quickly as possible."
     tags: [long_term]
+    category: routine-long-term
     expected_kind: roadmap
 
   - id: ilt_02
     user_id: 4942915
     query: "Plan the rest of my CS degree starting from Fall 2026."
     tags: [long_term]
+    category: routine-long-term
     expected_kind: roadmap
 
   - id: ilt_03
     user_id: 6564893
     query: "Give me a roadmap for the SDD track."
     tags: [long_term]
+    category: routine-long-term
     expected_kind: roadmap
 
   - id: ilt_04
     user_id: 4942915
     query: "I want to graduate by Spring 2028. What should I take each semester?"
     tags: [long_term]
+    category: routine-long-term
     expected_kind: roadmap
 
   - id: ilt_05
     user_id: 7689039
     query: "Plan my MS-CS thesis-track sequence over the next year."
     tags: [long_term]
+    category: routine-long-term
     expected_kind: roadmap
 
   # ───── in-scope skill-aligned ─────
@@ -87,18 +116,21 @@ queries:
     user_id: 4942915
     query: "I want a career in cybersecurity — what classes align?"
     tags: [skill]
+    category: routine-skill-aligned
     expected_kind: single_term
 
   - id: isk_02
     user_id: 4942915
     query: "Recommend courses to prepare for software engineering internships."
     tags: [skill]
+    category: routine-skill-aligned
     expected_kind: single_term
 
   - id: isk_03
     user_id: 4942915
     query: "I want to focus on data engineering before graduating."
     tags: [skill, long_term]
+    category: routine-skill-aligned
     expected_kind: roadmap
 
   # ───── in-scope check / explain / credits ─────
@@ -106,18 +138,21 @@ queries:
     user_id: 4942915
     query: "Am I eligible to take COP_3530?"
     tags: [check_prerequisite]
+    category: routine-explain
     expected_kind: clarification
 
   - id: iex_02
     user_id: 4942915
     query: "Why do I need to take MAC_2311 before COP_3337?"
     tags: [explain]
+    category: routine-explain
     expected_kind: clarification
 
   - id: iex_03
     user_id: 4942915
     query: "How many credits is CAP_4630?"
     tags: [credit_info]
+    category: routine-explain
     expected_kind: clarification
 
   # ───── in-scope edge — empty history ─────
@@ -125,24 +160,28 @@ queries:
     user_id: 4942915
     query: "I'm just starting my CS degree. What should I take first?"
     tags: [short_term, fresh]
+    category: routine-fresh-student
     expected_kind: single_term
 
   - id: iem_02
     user_id: 4942915
     query: "Plan my whole CS degree from semester 1."
     tags: [long_term, fresh]
+    category: routine-fresh-student
     expected_kind: roadmap
 
   - id: iem_03
     user_id: 4942915
     query: "I want to maximize my GPA in my next semester. What's safe?"
     tags: [short_term]
+    category: routine-fresh-student
     expected_kind: single_term
 
   - id: iem_04
     user_id: 4942915
     query: "Give me a 3-course load that's manageable."
     tags: [short_term]
+    category: routine-fresh-student
     expected_kind: single_term
 
   # ───── adversarial: ambiguous course codes ─────
@@ -150,18 +189,21 @@ queries:
     user_id: 4942915
     query: "Is cap-4630 something I can take next semester?"
     tags: [adversarial, ambiguous]
+    category: probe-ambiguous-code
     expected_kind: clarification
 
   - id: adv_amb_02
     user_id: 4942915
     query: "What courses align with COP3530 and MAD 2104?"
     tags: [adversarial, ambiguous]
+    category: probe-ambiguous-code
     expected_kind: single_term
 
   - id: adv_amb_03
     user_id: 4942915
     query: "Recommend something with the word 'algorithms' in the title."
     tags: [adversarial, ambiguous]
+    category: probe-ambiguous-code
     expected_kind: single_term
 
   # ───── adversarial: unknown / fabricated courses ─────
@@ -169,12 +211,14 @@ queries:
     user_id: 4942915
     query: "Can I take COP_9999 next semester?"
     tags: [adversarial, unknown_course]
+    category: probe-unknown-course
     expected_kind: clarification
 
   - id: adv_unk_02
     user_id: 4942915
     query: "Recommend BIO_2010 and CHEM_1045 for next term."
     tags: [adversarial, unknown_course]
+    category: probe-unknown-course
     expected_kind: single_term
 
   # ───── adversarial: prereq violations ─────
@@ -182,18 +226,21 @@ queries:
     user_id: 4942915
     query: "I want COP_4710 next semester whatever the prereqs are."
     tags: [adversarial, prereq_conflict]
+    category: probe-prereq-violation
     expected_kind: single_term
 
   - id: adv_pre_02
     user_id: 4942915
     query: "Skip COP_3530 and put me in COP_4338 directly."
     tags: [adversarial, prereq_conflict]
+    category: probe-prereq-violation
     expected_kind: single_term
 
   - id: adv_pre_03
     user_id: 4942915
     query: "Plan a roadmap that takes the senior capstone in semester 2."
     tags: [adversarial, prereq_conflict, long_term]
+    category: probe-prereq-violation
     expected_kind: roadmap
 
   # ───── adversarial: credit-cap stress ─────
@@ -201,12 +248,14 @@ queries:
     user_id: 4942915
     query: "Pack 24 credits into next semester so I graduate sooner."
     tags: [adversarial, credit_overload]
+    category: probe-credit-overload
     expected_kind: single_term
 
   - id: adv_cap_02
     user_id: 4942915
     query: "Give me an 8-course semester plan."
     tags: [adversarial, credit_overload]
+    category: probe-credit-overload
     expected_kind: single_term
 
   # ───── adversarial: transfer credit / external rules ─────
@@ -214,12 +263,14 @@ queries:
     user_id: 4942915
     query: "I took CS101 at another school — count that as COP_2210 and continue."
     tags: [adversarial, transfer]
+    category: probe-transfer-credit
     expected_kind: single_term
 
   - id: adv_tx_02
     user_id: 4942915
     query: "I have AP credit for Calc I. Adjust my plan accordingly."
     tags: [adversarial, transfer]
+    category: probe-transfer-credit
     expected_kind: roadmap
 
   # ───── adversarial: double-major / minor ─────
@@ -227,12 +278,14 @@ queries:
     user_id: 4942915
     query: "I want to add a math minor — what courses should I add to my plan?"
     tags: [adversarial, double_major]
+    category: probe-multi-program
     expected_kind: roadmap
 
   - id: adv_dbl_02
     user_id: 4942915
     query: "Plan for CS BS plus IT BS at the same time."
     tags: [adversarial, double_major]
+    category: probe-multi-program
     expected_kind: roadmap
 
   # ───── adversarial: out-of-scope ─────
@@ -240,18 +293,21 @@ queries:
     user_id: 4942915
     query: "What's the best dorm on campus?"
     tags: [adversarial, out_of_scope]
+    category: probe-out-of-scope
     expected_kind: refusal
 
   - id: adv_oos_02
     user_id: 4942915
     query: "Help me write my resume."
     tags: [adversarial, out_of_scope]
+    category: probe-out-of-scope
     expected_kind: refusal
 
   - id: adv_oos_03
     user_id: 4942915
     query: "Diagnose my back pain."
     tags: [adversarial, out_of_scope]
+    category: probe-out-of-scope
     expected_kind: refusal
 
   # ───── adversarial: conflicting requirements ─────
@@ -259,18 +315,21 @@ queries:
     user_id: 4942915
     query: "I want to take ONLY graduate-level courses next semester."
     tags: [adversarial, conflict]
+    category: probe-conflict
     expected_kind: single_term
 
   - id: adv_cnf_02
     user_id: 4942915
     query: "Schedule me for COT_3100 AND MAD_2104 in the same term."
     tags: [adversarial, one_of_group]
+    category: probe-conflict
     expected_kind: single_term
 
   - id: adv_cnf_03
     user_id: 4942915
     query: "Build a roadmap that takes only fall-only courses every spring."
     tags: [adversarial, term_conflict, long_term]
+    category: probe-conflict
     expected_kind: roadmap
 
   # ───── adversarial: temporal / multi-turn (single-shot still meaningful) ─────
@@ -278,18 +337,21 @@ queries:
     user_id: 4942915
     query: "If I drop COP_3337 from my plan, what should I take instead?"
     tags: [adversarial, what_if]
+    category: probe-what-if
     expected_kind: single_term
 
   - id: adv_tmp_02
     user_id: 4942915
     query: "I failed COT_3100 last term. Adjust my plan."
     tags: [adversarial, what_if]
+    category: probe-what-if
     expected_kind: roadmap
 
   - id: adv_tmp_03
     user_id: 4942915
     query: "I need to repeat MAC_2311. Where does it fit?"
     tags: [adversarial, what_if]
+    category: probe-what-if
     expected_kind: single_term
 
   # ───── adversarial: structural ambiguity ─────
@@ -297,16 +359,149 @@ queries:
     user_id: 4942915
     query: "Plan my CS or IT degree, whichever finishes faster."
     tags: [adversarial, multi_program]
+    category: probe-multi-program
     expected_kind: roadmap
 
   - id: adv_str_02
     user_id: 4942915
     query: "Recommend the bare minimum to graduate."
     tags: [adversarial, optimization]
+    category: probe-optimization
     expected_kind: roadmap
 
   - id: adv_str_03
     user_id: 4942915
     query: "Give me a plan that maximizes elective freedom."
     tags: [adversarial, optimization]
+    category: probe-optimization
+    expected_kind: roadmap
+
+  # ═════════════════════════════════════════════════════════════════════
+  # ROUTINE v2 EXTENSION — 15 additional in-scope queries.
+  #
+  # These extend the routine half of the benchmark to 35 queries so that
+  # routine queries are not a minority. They are NOT in the paper's
+  # locked 46-query JSONL snapshots; running `run_llm.py` regenerates
+  # plans for the full 61-query suite. The original 46-query results
+  # (Table 1, Table 3) remain reproducible bit-for-bit from the audited
+  # snapshots in evaluation/audited/.
+  #
+  # All user_ids reference the three seeded students that appear in the
+  # existing snapshots:
+  #   - 4942915 (CS-BS, early-degree)
+  #   - 6564893 (CS-BS-SDD, early-degree)
+  #   - 7689039 (MS-CS, late-degree)
+  # No new student profiles are introduced.
+  # All referenced course codes (COP_4610, COP_4338, CEN_4010) are
+  # confirmed present in prolog_kb/course_titles.pl.
+  # ═════════════════════════════════════════════════════════════════════
+
+  # ───── routine v2: additional short-term (rebalanced across students) ─────
+  - id: ist_06
+    user_id: 6564893      # CS-BS-SDD, exercises under-used profile
+    query: "What classes should I take next semester to stay on the SDD track?"
+    tags: [short_term]
+    category: routine-short-term
+    expected_kind: single_term
+
+  - id: ist_07
+    user_id: 7689039      # MS-CS, exercises late-degree profile
+    query: "Recommend three graduate electives I can finish in one semester."
+    tags: [short_term]
+    category: routine-short-term
+    expected_kind: single_term
+
+  - id: ist_08
+    user_id: 4942915
+    query: "Plan my next semester with at most 12 credits."
+    tags: [short_term]
+    category: routine-short-term
+    expected_kind: single_term
+
+  # ───── routine v2: additional long-term roadmaps ─────
+  - id: ilt_06
+    user_id: 6564893
+    query: "Build a full roadmap for the SDD track from where I am now."
+    tags: [long_term]
+    category: routine-long-term
+    expected_kind: roadmap
+
+  - id: ilt_07
+    user_id: 7689039
+    query: "Plan my MS-CS coursework for the next two semesters."
+    tags: [long_term]
+    category: routine-long-term
+    expected_kind: roadmap
+
+  - id: ilt_08
+    user_id: 4942915
+    query: "Outline a 3-year plan that gets me to graduation."
+    tags: [long_term]
+    category: routine-long-term
+    expected_kind: roadmap
+
+  # ───── routine v2: additional skill-aligned ─────
+  - id: isk_04
+    user_id: 6564893
+    query: "I want to focus on software architecture — what fits the SDD track?"
+    tags: [skill]
+    category: routine-skill-aligned
+    expected_kind: single_term
+
+  - id: isk_05
+    user_id: 4942915
+    query: "Recommend courses to prepare for a backend engineering role."
+    tags: [skill]
+    category: routine-skill-aligned
+    expected_kind: single_term
+
+  - id: isk_06
+    user_id: 4942915
+    query: "I'm interested in algorithms research — which classes should I prioritize?"
+    tags: [skill]
+    category: routine-skill-aligned
+    expected_kind: single_term
+
+  # ───── routine v2: additional explain (prereq / credit / program) ─────
+  - id: iex_04
+    user_id: 4942915
+    query: "What are the prerequisites for COP_4610?"
+    tags: [explain]
+    category: routine-explain
+    expected_kind: clarification
+
+  - id: iex_05
+    user_id: 4942915
+    query: "Is COP_4338 required for my CS BS program?"
+    tags: [explain]
+    category: routine-explain
+    expected_kind: clarification
+
+  - id: iex_06
+    user_id: 6564893
+    query: "How many credits is CEN_4010, and what do I need before it?"
+    tags: [explain, credit_info]
+    category: routine-explain
+    expected_kind: clarification
+
+  # ───── routine v2: additional fresh-student ─────
+  - id: iem_05
+    user_id: 4942915
+    query: "I just transferred in. Help me pick a manageable first semester."
+    tags: [short_term, fresh]
+    category: routine-fresh-student
+    expected_kind: single_term
+
+  - id: iem_06
+    user_id: 4942915
+    query: "What introductory math courses do I need before any CS class?"
+    tags: [explain, fresh]
+    category: routine-fresh-student
+    expected_kind: clarification
+
+  - id: iem_07
+    user_id: 6564893
+    query: "I just started the SDD track. What's a sensible first-year schedule?"
+    tags: [long_term, fresh]
+    category: routine-fresh-student
     expected_kind: roadmap

@@ -1,0 +1,127 @@
+# Verifier-clean advisor-style reference plans for the similarity-vs-safety
+# experiment.
+#
+# These are not string-match gold labels for the benchmark. They are compact,
+# representative plans used only to test whether generated plans that look
+# close to an advisor-style reference can still carry formal violations. Every
+# reference below must pass the audit verifier with zero violations before it is
+# used by evaluation/similarity_vs_safety.py.
+
+references:
+  - id: ist_01
+    note: "Routine next-semester CS-BS plan after Programming I, Discrete Math, and COT_3100."
+    student_id: 4942915
+    program: CS-BS
+    completed: [CGS_1920, COP_2210, MAD_2104, COT_3100]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337, CGS_3095, ENC_3249]
+
+  - id: ist_02
+    note: "Five-course Fall 2026 request with a 15-credit cap; all courses are verifier-clean."
+    student_id: 4942915
+    program: CS-BS
+    completed: [CGS_1920, COP_2210, MAD_2104, COT_3100]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337, CGS_3095, ENC_3249, CIS_3950]
+
+  - id: ilt_02
+    note: "CS-BS roadmap starting Fall 2026, ordered so prerequisite chains are satisfied before dependent courses."
+    student_id: 4942915
+    program: CS-BS
+    completed: [CGS_1920, COP_2210, MAD_2104, COT_3100]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337, CGS_3095, ENC_3249]
+      - semester: Spring 2027
+        courses: [COP_3530, CDA_3102]
+      - semester: Fall 2027
+        courses: [COP_4338, CEN_4010, COP_4555, CAP_4630]
+      - semester: Spring 2028
+        courses: [COP_4610, CEN_4021, COP_4710]
+
+  - id: ilt_03
+    note: "SDD-track roadmap using only courses accepted by the loaded SDD Prolog rule file."
+    student_id: 6564893
+    program: CS-BS-SDD
+    completed: [CGS_1920, COP_2210, MAD_2104]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337, CDA_3102]
+      - semester: Spring 2027
+        courses: [COP_3530]
+      - semester: Fall 2027
+        courses: [COP_4338, CEN_4010, CEN_4072]
+      - semester: Spring 2028
+        courses: [COP_4610, CEN_4021, COP_4710]
+
+  - id: ilt_05
+    note: "MS-CS thesis-track-style sequence using remaining catalog courses for a late-degree student."
+    student_id: 7689039
+    program: MS-CS
+    completed: [CEN_5011, COP_5614, COP_5725, CEN_5120, COP_6611, CAP_5602, CAP_5768, TCN_5440, TCN_6275, TCN_5010, CAP_5640, CEN_5076, CIS_6930, TCN_6270, CAP_5610, COT_5520, TCN_5640, COT_6936, CEN_5064, CIS_5372, CDA_6939, CIS_5346, CEN_6075, COT_6931, CDA_5655, COT_5310, TCN_5445, COT_5428, CNT_5109, TCN_5080, TCN_5060, CAP_5771, CNT_5415, CAP_5627, TCN_5030, CNT_6208, CIS_5373, COP_6727, COT_6421, TCN_6880, CEN_6070, COP_5621, CAP_5738, TCN_6215, CIS_5370, COP_6556, TCN_5421, TCN_6420, CIS_5208, CEN_5079, TCN_6430, TCN_6260, CNT_6207, CAP_6778, TCN_6450, CIS_5374]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [CAP_5507, CAP_5701, CAP_6736]
+      - semester: Spring 2027
+        courses: [CEN_5082, COT_6446]
+
+  - id: isk_01
+    note: "Cybersecurity-aligned CS-BS plan; CIS_4203 is reachable after COP_2210."
+    student_id: 4942915
+    program: CS-BS
+    completed: [CGS_1920, COP_2210, MAD_2104, COT_3100]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337, CGS_3095, ENC_3249]
+      - semester: Spring 2027
+        courses: [COP_3530, CIS_4203]
+
+  - id: isk_02
+    note: "Software-engineering-internship plan that reaches CEN_4010 only after COP_3530."
+    student_id: 4942915
+    program: CS-BS
+    completed: [CGS_1920, COP_2210, MAD_2104, COT_3100]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337, CGS_3095, ENC_3249]
+      - semester: Spring 2027
+        courses: [COP_3530]
+      - semester: Fall 2027
+        courses: [CEN_4010, COP_4338]
+
+  - id: adv_pre_01
+    note: "Prerequisite-stress reference that delays COP_4710 until after COP_3337 and COP_3530."
+    student_id: 4942915
+    program: CS-BS
+    completed: [CGS_1920, COP_2210, MAD_2104, COT_3100]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337]
+      - semester: Spring 2027
+        courses: [COP_3530]
+      - semester: Fall 2027
+        courses: [COP_4710]
+
+  - id: adv_pre_02
+    note: "Prerequisite-stress reference that refuses to skip COP_3530 before COP_4338."
+    student_id: 4942915
+    program: CS-BS
+    completed: [CGS_1920, COP_2210, MAD_2104, COT_3100]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337]
+      - semester: Spring 2027
+        courses: [COP_3530]
+      - semester: Fall 2027
+        courses: [COP_4338]
+
+  - id: adv_cap_01
+    note: "Credit-overload request answered with a safe compact load rather than 24 credits."
+    student_id: 4942915
+    program: CS-BS
+    completed: [CGS_1920, COP_2210, MAD_2104, COT_3100]
+    reference_plan:
+      - semester: Fall 2026
+        courses: [COP_3337, CGS_3095, ENC_3249]
