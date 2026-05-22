@@ -105,6 +105,25 @@ evaluation/audited/*_test.jsonl
 evaluation/audited/*_smoke.jsonl
 evaluation/audited/*_scratch*.jsonl
 
+# ── Internal sprint artefacts — not for the public artefact ──────
+# Pre-audit raw LLM outputs (the audited/ versions supersede them).
+evaluation/runs/
+# Backup taken before the May 20 re-audit pass; not needed for repro.
+evaluation/audited/_v1_backup/
+# Individual temperature-sweep files — only the summary .txt is paper-relevant.
+evaluation/audited/temperature_sweep/
+# Tool-calling smoke / phase-B development outputs (the full run audited
+# JSONL is what §5.7 cites).
+evaluation/audited/tool_calling/smoke_audited.jsonl
+evaluation/audited/tool_calling/phase_b_audited.jsonl
+# Superseded intermediate panel-size metrics — only ten_model_v1.txt is current.
+evaluation/metrics/four_model_v1.txt
+evaluation/metrics/five_model_v1.txt
+evaluation/metrics/seven_model_v1.txt
+evaluation/metrics/eight_model_v1.txt
+evaluation/metrics/nine_model_v1.txt
+evaluation/metrics/ten_model_with_claude_haiku_4_5.txt
+
 # Compiled LaTeX (in case the manuscript gets pulled into this tree)
 *.aux
 *.fdb_latexmk

@@ -12,8 +12,11 @@ duplicate course (left), the audit layer's typed verdict and SWI-Prolog
 proof (middle), and the verifier-checked repaired plan (right).*
 
 The repository contains the audit layer, the SWI-Prolog knowledge base, the 46-query
-adversarial benchmark, the three frozen evaluation snapshots used in Table 1, and the
-leave-one-out verifier ablation (Table 3).
+benchmark used in Table 1 / Table 3 (the locked v1 snapshot), the three frozen evaluation
+snapshots that reproduce those tables bit-for-bit, and the leave-one-out verifier
+ablation. A v2 routine extension (`+15` queries, bringing the YAML to 61) is also
+checked in; it follows the same annotation protocol but is not yet covered by the locked
+snapshots. See `evaluation/taxonomy.md` for the category definitions and coverage table.
 
 ---
 
@@ -42,6 +45,7 @@ without re-querying the LLMs.
 ├── scripts/            # one-command reproduction, service bring-up, smoke test
 ├── tests/              # offline pytest suite + end-to-end snapshot regression
 ├── docs/design_notes.md
+├── docs/portability.md   # what a second-institution deployment costs (rules, LOC, hours)
 ├── .env.example
 ├── requirements.txt
 ├── CITATION.cff
@@ -195,10 +199,13 @@ the prerequisite-chain explanations, and the repaired plan with its edit list.
 ## What this codebase does *not* claim
 
 - It is **not** a curriculum DB for an arbitrary institution. The schema is provided;
-  populating it for a specific catalog is the deployer's responsibility.
-- It is **not** a benchmark release. The 46-query suite is the seed used in the paper;
-  expansion to a multi-institution benchmark is left as future work (see the paper's
-  *Limitations* section).
+  populating it for a specific catalog is the deployer's responsibility. See
+  `docs/portability.md` for what a second-institution deployment actually costs
+  (rule LOC, author-hours per program, what ports as-is vs. needs authoring).
+- It is **not** a benchmark release. The 46-query suite (v1) is the seed used in the
+  paper. The current YAML adds a v2 routine extension (+15 queries) so the suite is now
+  35 routine + 26 probe = 61 queries; expansion to a multi-institution benchmark is left
+  as future work (see the paper's *Limitations* section).
 - It is **not** a new advising agent. The contribution is the post-generation
   **audit layer** that wraps any plan generator; the symbolic curriculum rules in
   `prolog_kb/flowchart_rules/` are pre-existing institutional rules.
