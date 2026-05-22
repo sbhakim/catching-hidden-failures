@@ -22,6 +22,15 @@ from .models import Plan, SemesterBlock
 # number is loose enough to catch both 3-digit (e.g. ENC_101) and 4-digit
 # courses without false-matching things like file paths.
 _COURSE_RX = re.compile(r"\b([A-Z]{2,4})[_\-\s]?(\d{3,4})\b")
+
+# Reasoning models (e.g. DeepSeek-R1) emit free-form chain-of-thought
+# inside <think>...</think> blocks before the final answer. Those blocks
+# can mention semesters and courses informally; if the parser fell back
+# to free-text mode it would pull semester/course pairs out of the
+# reasoning, polluting the audited plan. Strip them before parsing.
+# This is a no-op for v1 paper snapshots (Qwen/Mistral/Gemma 2 outputs
+# contain no <think> tags), so it leaves Table 1 / Table 3 unaffected.
+_THINK_BLOCK_RX = re.compile(r"<think\b[^>]*>.*?</think\s*>", re.I | re.S)
 _SEMESTER_RX = re.compile(
     r"\b(Fall|Spring|Summer|Autumn|Winter)\s*(\d{4})?\b", re.I
 )
@@ -121,6 +130,8 @@ def parse(text_or_json, student_id: int, program: str,
     if isinstance(text_or_json, dict):
         return parse_json(text_or_json, student_id, program, completed, source)
     text = str(text_or_json)
+    # Strip reasoning-model <think>...</think> blocks before parsing.
+    text = _THINK_BLOCK_RX.sub("", text)
     md_plan = parse_markdown(text, student_id, program, completed, source)
     if md_plan.blocks:
         return md_plan

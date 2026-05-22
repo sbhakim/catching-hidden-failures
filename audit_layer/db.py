@@ -13,6 +13,16 @@ from __future__ import annotations
 import os, psycopg2
 from functools import lru_cache
 
+# Load credentials from `.env` if present. Matches the pattern used in
+# `db/db_config.py` and the placeholder in `.env.example`. Without this,
+# `os.getenv` falls through to the in-code defaults, which silently leaves
+# the audit layer pointing at the wrong password for a non-default install.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 def _conn():
     return psycopg2.connect(
