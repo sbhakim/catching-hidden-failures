@@ -49,15 +49,72 @@ def run_anthropic(query: str, program: str, completed: list[str], model: str) ->
     return msg.content[0].text
 
 
-def run_openai(query: str, program: str, completed: list[str], model: str) -> str:
+def run_openrouter(query: str, program: str, completed: list[str], model: str) -> str:
+    """OpenRouter's API is OpenAI-compatible. Routes a single request to any
+    of the hosted models OpenRouter aggregates (Google Gemini, Anthropic
+    Claude, Meta Llama, etc.). Model IDs use the ``provider/model-name``
+    format (e.g. ``google/gemini-2.5-flash-lite``).
+    """
+    import os
     from openai import OpenAI
-    client = OpenAI()
+    client = OpenAI(
+        api_key=os.environ["OPENROUTER_API_KEY"],
+        base_url="https://openrouter.ai/api/v1",
+    )
     prompt = _build_prompt(query, program, completed)
     resp = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=600,
+        max_tokens=2000,
     )
+    return resp.choices[0].message.content or ""
+
+
+def run_deepseek_api(query: str, program: str, completed: list[str], model: str) -> str:
+    """DeepSeek's hosted API at api.deepseek.com is OpenAI-compatible.
+
+    We reuse the OpenAI SDK with a custom ``base_url`` and the
+    ``DEEPSEEK_API_KEY`` env var. ``deepseek-chat`` (V4 Flash non-thinking)
+    is the cheap default; ``deepseek-reasoner`` activates the thinking
+    mode and produces ``<think>...</think>`` blocks that our parser
+    already strips before plan extraction.
+    """
+    import os
+    from openai import OpenAI
+    client = OpenAI(
+        api_key=os.environ["DEEPSEEK_API_KEY"],
+        base_url="https://api.deepseek.com",
+    )
+    prompt = _build_prompt(query, program, completed)
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=2000,
+    )
+    return resp.choices[0].message.content or ""
+
+
+def run_openai(query: str, program: str, completed: list[str], model: str) -> str:
+    from openai import OpenAI
+    client = OpenAI()
+    prompt = _build_prompt(query, program, completed)
+    # GPT-5 family (e.g. gpt-5, gpt-5-nano) rejects `max_tokens` and requires
+    # `max_completion_tokens`. The newer parameter is also accepted by
+    # earlier chat-completion models, so we use it uniformly. GPT-5
+    # reasoning models also spend a large fraction of the budget on
+    # internal reasoning tokens that never reach `choices[0].message.content`
+    # unless we either raise the cap substantially or instruct the model to
+    # minimise reasoning. We do both: 2000-token budget + minimal-effort
+    # reasoning, applied only to gpt-5* models so other model families
+    # keep their existing decoding contract.
+    kwargs = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_completion_tokens": 2000,
+    }
+    if model.startswith("gpt-5"):
+        kwargs["reasoning_effort"] = "minimal"
+    resp = client.chat.completions.create(**kwargs)
     return resp.choices[0].message.content or ""
 
 
@@ -78,15 +135,28 @@ def run_baseline_service(query: str, program: str, completed: list[str], model: 
 def run_ollama(query: str, program: str, completed: list[str], model: str) -> str:
     """Hit a local Ollama server (default http://127.0.0.1:11434).
     Install: https://ollama.com/download   then `ollama pull <model>`.
-    Free, offline, reproducible. Recommended for paper experiments."""
+    Free, offline, reproducible. Recommended for paper experiments.
+
+    Decoding overrides via env (used by the temperature-sweep sensitivity
+    analysis; absent → published defaults so existing snapshots reproduce):
+        OLLAMA_TEMPERATURE  float, default 0.2
+        OLLAMA_SEED         int,   default unset (Ollama draws its own)
+    """
     import httpx
     url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
     prompt = _build_prompt(query, program, completed)
+    options: dict[str, object] = {
+        "num_predict": 600,
+        "temperature": float(os.getenv("OLLAMA_TEMPERATURE", "0.2")),
+    }
+    seed_env = os.getenv("OLLAMA_SEED")
+    if seed_env is not None and seed_env != "":
+        options["seed"] = int(seed_env)
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
-        "options": {"num_predict": 600, "temperature": 0.2},
+        "options": options,
     }
     r = httpx.post(url, json=payload, timeout=300.0)
     r.raise_for_status()
@@ -123,8 +193,15 @@ def _load_hf_model(model_id: str):
     return tok, m
 
 
-def run_hf_local(query: str, program: str, completed: list[str], model: str) -> str:
-    """Direct transformers load for cached HF models."""
+def run_hf_local(query: str, program: str, completed: list[str], model: str,
+                 max_new_tokens: int = 600) -> str:
+    """Direct transformers load for cached HF models.
+
+    ``max_new_tokens`` defaults to 600 (used for v1 paper snapshots so they
+    reproduce bit-for-bit). Reasoning models such as DeepSeek-R1 need a
+    larger budget because <think>...</think> blocks consume tokens before
+    the actual plan is emitted; pass e.g. 1500 for those.
+    """
     import torch
 
     tok, m = _load_hf_model(model)
@@ -134,7 +211,7 @@ def run_hf_local(query: str, program: str, completed: list[str], model: str) -> 
         prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     inputs = tok(prompt, return_tensors="pt").to(m.device)
     with torch.no_grad():
-        out = m.generate(**inputs, max_new_tokens=600, do_sample=False,
+        out = m.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False,
                           pad_token_id=tok.eos_token_id)
     return tok.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
 
@@ -142,10 +219,23 @@ def run_hf_local(query: str, program: str, completed: list[str], model: str) -> 
 # Pluggable runner registry. Add custom models by extending this dict.
 RUNNERS = {
     # ── commercial (cost-incurring, optional) ─────────────────────────
+    "claude-haiku-4-5":  lambda q, p, c: run_anthropic(q, p, c, "claude-haiku-4-5"),
     "claude-opus-4-7":   lambda q, p, c: run_anthropic(q, p, c, "claude-opus-4-7"),
     "claude-sonnet-4-6": lambda q, p, c: run_anthropic(q, p, c, "claude-sonnet-4-6"),
     "gpt-4o":            lambda q, p, c: run_openai(q, p, c, "gpt-4o"),
+    "gpt-4o-mini":       lambda q, p, c: run_openai(q, p, c, "gpt-4o-mini"),
     "gpt-5":             lambda q, p, c: run_openai(q, p, c, "gpt-5"),
+    "gpt-5-nano":        lambda q, p, c: run_openai(q, p, c, "gpt-5-nano"),
+
+    # ── hosted DeepSeek API (OpenAI-compatible) ────────────────────────
+    "deepseek-chat":     lambda q, p, c: run_deepseek_api(q, p, c, "deepseek-chat"),
+    "deepseek-reasoner": lambda q, p, c: run_deepseek_api(q, p, c, "deepseek-reasoner"),
+
+    # ── hosted via OpenRouter (OpenAI-compatible) ──────────────────────
+    "openrouter:gemini-2.5-flash-lite":
+        lambda q, p, c: run_openrouter(q, p, c, "google/gemini-2.5-flash-lite"),
+    "openrouter:llama-3.3-70b-instruct":
+        lambda q, p, c: run_openrouter(q, p, c, "meta-llama/llama-3.3-70b-instruct"),
 
     # ── offline via Ollama (recommended for paper experiments) ────────
     "ollama:qwen2.5:7b":          lambda q, p, c: run_ollama(q, p, c, "qwen2.5:7b-instruct"),
@@ -156,11 +246,17 @@ RUNNERS = {
 
     # ── offline via direct HF transformers load ───────────────────────
     "hf:deepseek-r1-qwen-7b":     lambda q, p, c: run_hf_local(q, p, c, "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"),
+    # DeepSeek-R1-0528 (reasoning model) — needs a larger generation budget
+    # because <think>...</think> blocks consume tokens before the plan.
+    "hf:deepseek-r1-0528-qwen3-8b": lambda q, p, c: run_hf_local(
+        q, p, c, "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B", max_new_tokens=1500),
     "hf:llama3.2-1b":             lambda q, p, c: run_hf_local(q, p, c, "meta-llama/Llama-3.2-1B"),
     "hf:llama3.2-3b":             lambda q, p, c: run_hf_local(q, p, c, "meta-llama/Llama-3.2-3B"),
     "hf:mistral-7b-instruct-v0.3": lambda q, p, c: run_hf_local(q, p, c, "mistralai/Mistral-7B-Instruct-v0.3"),
     "hf:gemma-2-9b-it":           lambda q, p, c: run_hf_local(q, p, c, "google/gemma-2-9b-it"),
+    "hf:gemma-3-12b-it":          lambda q, p, c: run_hf_local(q, p, c, "google/gemma-3-12b-it"),
     "hf:qwen3-8b":                lambda q, p, c: run_hf_local(q, p, c, "Qwen/Qwen3-8B"),
+    "hf:qwen2.5-7b-instruct":     lambda q, p, c: run_hf_local(q, p, c, "Qwen/Qwen2.5-7B-Instruct"),
 
     # ── external baseline generator (set BASELINE_LLM_URL) ────────────
     "baseline-service": run_baseline_service,
@@ -198,6 +294,7 @@ def main():
                 "completed": completed,
                 "query": q["query"],
                 "tags": q.get("tags", []),
+                "category": q.get("category"),
                 "expected_kind": q.get("expected_kind"),
                 "llm": args.llm,
                 "raw": raw,
