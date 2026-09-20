@@ -192,4 +192,4 @@ as described above. See [`CITATION.cff`](CITATION.cff) for software attribution.
 
 ## License and contact
 
-MIT; see [LICENSE](LICENSE). Contact: safayat.b.hakim@gmail.com.
+MIT; see [LICENSE](LICENSE). Contact: `safayat [dot] b [dot] hakim [at] gmail [dot] com`.
