@@ -1,6 +1,6 @@
 """Compute headline metrics across one or more audited LLM runs.
 
-This is the script that produces Table 1 of the paper. All rates are
+This summarizes local batch audits. Unless documented below, rates are
 computed against the full input population N (the number of audited rows
 in the file), *not* the number of flagged plans, so they are directly
 comparable across models.
@@ -118,7 +118,9 @@ def per_record_outcomes(
         }
         if rec["repair_attempted"]:
             repaired = Plan.model_validate(r["repaired_plan"])
-            rec["repair_compliant"] = not verifier.verify(repaired)
+            rec["repair_compliant"] = not verifier.verify(
+                repaired, credit_cap=r.get("credit_cap", verifier.DEFAULT_CREDIT_CAP)
+            )
         out.append(rec)
     return out
 
@@ -157,7 +159,7 @@ def timing_summary(rows: list[dict]) -> dict | None:
     ``--show-timings`` to spew zeros at them. Otherwise returns a dict
     mapping stage name to {n, mean, median, p95, max} milliseconds.
     """
-    stages = ("parser", "verifier", "explainer", "repair", "total")
+    stages = ("parser", "verifier", "explainer", "repair", "reverify", "scheduler", "scheduler_reverify", "total")
     samples: dict[str, list[float]] = {s: [] for s in stages}
     seen = False
     for r in rows:

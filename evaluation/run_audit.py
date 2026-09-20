@@ -22,7 +22,8 @@ with ``time.perf_counter()``:
         "verifier":  <float, ms in verifier.verify, dominated by Prolog>,
         "explainer": <float, ms in explainer.explain>,
         "repair":    <float, ms in repair.repair; 0.0 when no violations>,
-        "total":     <float, sum-ish wall time for the four stages>,
+        "reverify":  <float, ms checking the repaired candidate>,
+        "total":     <float, wall time including all five stages>,
     }
 
 These values are reported per row, so ``compute_metrics.py
@@ -41,7 +42,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from audit_layer import plan_parser, verifier, repair as repair_mod, explainer
+from audit_layer import plan_parser
+from audit_layer.pipeline import audit_plan
 
 
 def _ms_since(t0: float) -> float:
@@ -75,43 +77,37 @@ def main():
             )
             parser_ms = _ms_since(t0)
 
-            t0 = time.perf_counter()
-            violations = verifier.verify(plan, credit_cap=args.credit_cap)
-            verifier_ms = _ms_since(t0)
-
-            t0 = time.perf_counter()
-            proof = explainer.explain(plan, violations)
-            explainer_ms = _ms_since(t0)
-
-            t0 = time.perf_counter()
-            repaired_plan, ops = (None, [])
-            if violations:
-                repaired_plan, ops = repair_mod.repair(
-                    plan, violations, credit_cap=args.credit_cap
-                )
-            repair_ms = _ms_since(t0)
+            result = audit_plan(plan, credit_cap=args.credit_cap)
 
             total_ms = _ms_since(t_total)
 
             row.update({
                 "parsed_plan": plan.model_dump(),
-                "violations": [v.model_dump() for v in violations],
-                "proof_tree": proof,
-                "repaired_plan": repaired_plan.model_dump() if repaired_plan else None,
-                "repair_ops": [op.model_dump() for op in ops],
-                "edit_distance": len(ops),
-                "compliant": not violations,
+                "violations": [v.model_dump() for v in result.violations],
+                "proof_tree": result.proof_tree,
+                "repaired_plan": result.repaired_plan.model_dump() if result.repaired_plan else None,
+                "repair_ops": [op.model_dump() for op in result.repair_ops],
+                "edit_distance": result.edit_distance,
+                "compliant": result.compliant,
+                "status": result.status,
+                "credit_cap": result.credit_cap,
+                "repair_strategy": result.repair_strategy,
+                "handoff_reasons": result.handoff_reasons,
+                "unresolved_courses": result.unresolved_courses,
+                "repaired_compliant": result.repaired_compliant,
+                "residual_violations": (
+                    [v.model_dump() for v in result.residual_violations]
+                    if result.residual_violations is not None else None
+                ),
                 "timings_ms": {
+                    **result.timings_ms,
                     "parser":    parser_ms,
-                    "verifier":  verifier_ms,
-                    "explainer": explainer_ms,
-                    "repair":    repair_ms,
                     "total":     total_ms,
                 },
             })
             fout.write(json.dumps(row) + "\n")
-            print(f"[{row['id']}] compliant={not violations} "
-                  f"violations={len(violations)} edits={len(ops)} "
+            print(f"[{row['id']}] status={result.status} "
+                  f"violations={len(result.violations)} edits={result.edit_distance} "
                   f"audit={total_ms:.1f}ms")
 
 
