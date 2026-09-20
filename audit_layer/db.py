@@ -12,6 +12,7 @@ cache is per-process — restart to pick up catalog edits.
 from __future__ import annotations
 import os, psycopg2
 from functools import lru_cache
+from .errors import AuditUnavailable
 
 # Load credentials from `.env` if present. Matches the pattern used in
 # `db/db_config.py` and the placeholder in `.env.example`. Without this,
@@ -36,11 +37,16 @@ def _conn():
 
 @lru_cache(maxsize=2048)
 def credits_of(course_id: str) -> int:
-    """Return credits for a course; 0 if unknown."""
+    """Return recorded credits, including genuine zero-credit courses.
+
+    Missing or invalid metadata prevents certification; it is not zero load.
+    """
     with _conn() as c, c.cursor() as cur:
         cur.execute("SELECT credits FROM courses WHERE course_id=%s", (course_id.upper(),))
         row = cur.fetchone()
-        return int(row[0]) if row and row[0] is not None else 0
+        if not row or row[0] is None or row[0] < 0:
+            raise AuditUnavailable(f"Credits unavailable for {course_id.upper()}")
+        return int(row[0])
 
 
 @lru_cache(maxsize=2048)

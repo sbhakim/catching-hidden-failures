@@ -109,16 +109,11 @@ user:one_of_prereqs_fact(cop2210,[mac1140,mac1147,mac2311,mac2312]).
 user:one_of_prereqs_fact(mad2104,[mac1105,mgf1106]).
 
 % COT3100 ← any MAC, any COP; ♦ co-req one of {COP2210,COP2250,EEL2880}
-user:one_of_prereqs_fact(cot3100,         % COT3100: either a MAC or a COP
-    [ mac1105      % Example MAC
-    , mac1147      % (you can enumerate _all_ “any MAC” here)
-    , mac2311
-    , mac2312
-    , cop1000      % and “any COP” you care about
-    ]).
-user:corequisite(cot3100,cop2210).
-user:corequisite(cot3100,cop2250).
-user:corequisite(cot3100,eel2880).
+% Source: stored CS-BS flowchart rev. 4/2023, footnote for COT3100.
+% Both prior subject groups are required; co-requisites are alternatives.
+user:prerequisite_prefix(cot3100,mac).
+user:prerequisite_prefix(cot3100,cop).
+user:one_of_coreqs_fact(cot3100,[cop2210,cop2250,eel2880]).
 
 % Math ladder
 user:prerequisite(mac2311,mac1147).
@@ -150,8 +145,8 @@ user:prerequisite(cen4021,cen4010).
 user:elective(cap4506).  user:prerequisite(cap4506,mac2312).
 user:elective(cop4534).  user:prerequisite(cop4534,cop3530).
 user:elective(cot3510).
-  user:corequisite(cot3510,cot3100).
-  user:corequisite(cot3510,mad2104).
+  % Flowchart states OR; the separate syllabus prerequisite remains unaudited.
+  user:one_of_coreqs_fact(cot3510,[cot3100,mad2104]).
 user:elective(cot3541).
   user:prerequisite(cot3541,cop3337).
   user:one_of_prereqs_fact(cot3541,[cot3100,mad2104]).

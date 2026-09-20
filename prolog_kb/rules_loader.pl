@@ -7,7 +7,9 @@
        user:required/1,
        user:prerequisite/2,
        user:corequisite/2,
-       user:one_of_prereqs_fact/2.
+       user:one_of_prereqs_fact/2,
+       user:one_of_coreqs_fact/2,
+       user:prerequisite_prefix/2.
 
 :- dynamic
        program_rules/2,
@@ -15,7 +17,9 @@
        user:required/1,
        user:prerequisite/2,
        user:corequisite/2,
-       user:one_of_prereqs_fact/2.
+       user:one_of_prereqs_fact/2,
+       user:one_of_coreqs_fact/2,
+       user:prerequisite_prefix/2.
 
 % allow discontiguous predicates spread across files
 :- discontiguous
@@ -60,6 +64,8 @@ load_program(Prog) :-
     retractall(user:prerequisite(_,_)),
     retractall(user:corequisite(_,_)),
     retractall(user:one_of_prereqs_fact(_,_)),
+    retractall(user:one_of_coreqs_fact(_,_)),
+    retractall(user:prerequisite_prefix(_,_)),
 
     % always load eligibility rules first, so validate_id/4 is available
     safe_consult('flowchart_rules/eligibility_rules.pl'),
@@ -77,4 +83,3 @@ load_program(Prog) :-
 :- consult('./course_titles.pl').
 :- consult('./validator_rules.pl').  
 :- reexport(validator_rules, [validate_id/4, needed_chain/3]).
-

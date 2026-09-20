@@ -84,7 +84,7 @@ def explain(plan: Plan, violations: list[Violation]) -> list[str]:
             lines.append(f"[{v.semester}] {v.detail}")
         elif v.kind == ViolationKind.DUPLICATE_OF_COMPLETED:
             lines.append(
-                f"[{v.semester}] {v.course} is already in the student's history."
+                f"[{v.semester}] {v.course} is already completed or appears earlier in the plan."
             )
         elif v.kind == ViolationKind.UNKNOWN_COURSE:
             lines.append(f"[{v.semester}] {v.course} is not in the catalog.")

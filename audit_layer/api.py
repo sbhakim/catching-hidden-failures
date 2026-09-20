@@ -19,8 +19,10 @@ from typing import Any, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from . import db, plan_parser, verifier, repair as repair_mod, explainer
+from . import db, plan_parser, verifier
+from .pipeline import audit_plan
 from .models import Plan, AuditResult
+from .errors import AuditUnavailable
 
 
 class AuditRequest(BaseModel):
@@ -63,25 +65,13 @@ def audit(req: AuditRequest):
         source=req.source,
     )
 
-    violations = verifier.verify(plan, credit_cap=req.credit_cap)
-    proof = explainer.explain(plan, violations)
-
-    repaired_plan = None
-    repair_ops = []
-    if req.repair and violations:
-        repaired_plan, repair_ops = repair_mod.repair(
-            plan, violations, credit_cap=req.credit_cap
-        )
-
-    return AuditResult(
-        plan=plan,
-        compliant=not violations,
-        violations=violations,
-        repaired_plan=repaired_plan,
-        repair_ops=repair_ops,
-        edit_distance=len(repair_ops),
-        proof_tree=proof,
-    )
+    try:
+        return audit_plan(plan, credit_cap=req.credit_cap, do_repair=req.repair)
+    except AuditUnavailable as exc:
+        raise HTTPException(status_code=503, detail={
+            "code": "audit_unavailable",
+            "message": "Required curriculum checks could not be completed; no repair is certified."
+        }) from exc
 
 
 @app.post("/parse", response_model=Plan)

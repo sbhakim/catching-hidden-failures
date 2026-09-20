@@ -15,6 +15,7 @@ remaining courses in the same semester.
 from __future__ import annotations
 from .models import Plan, SemesterBlock, Violation, ViolationKind
 from . import db, prolog_bridge
+from .terms import ordered_terms
 
 
 DEFAULT_CREDIT_CAP = 18  # university-typical max; per-call override supported.
@@ -37,7 +38,7 @@ def _check_duplicate(course: str, completed: set[str], block_sem: str) -> Violat
             kind=ViolationKind.DUPLICATE_OF_COMPLETED,
             semester=block_sem,
             course=course,
-            detail=f"{course} is already completed",
+            detail=f"{course} is already completed or appears earlier in the plan",
         )
     return None
 
@@ -60,8 +61,9 @@ def _check_program_course(course: str, program: str, block_sem: str) -> Violatio
 
 
 def _check_prereq(course: str, taken_so_far: list[str], program: str,
-                  block_sem: str) -> Violation | None:
-    if prolog_bridge.is_eligible(taken_so_far, course, program=program):
+                  block_sem: str, concurrent=()) -> Violation | None:
+    if prolog_bridge.is_eligible(taken_so_far, course, program=program,
+                                 concurrent=concurrent):
         return None
     missing = prolog_bridge.prereqs_of(course, program=program)
     missing = [m for m in missing if m not in taken_so_far]
@@ -69,12 +71,15 @@ def _check_prereq(course: str, taken_so_far: list[str], program: str,
         kind=ViolationKind.PREREQ_MISSING,
         semester=block_sem,
         course=course,
-        detail=f"{course} requires {missing or '<unknown>'}; not satisfied at start of {block_sem}",
+        detail=f"{course} fails encoded prerequisite/co-requisite eligibility in {block_sem}; "
+               f"unmet listed prerequisite options: {missing or '<none; check co-requisites or subject groups>'}",
     )
 
 
 def _check_credit_cap(block: SemesterBlock, cap: int) -> Violation | None:
-    total = sum(db.credits_of(c) for c in block.courses)
+    # Unknown codes already fail catalog validity and can be removed. Known
+    # courses with unavailable credit metadata must instead stop certification.
+    total = sum(db.credits_of(c) for c in block.courses if db.course_exists(c))
     if total > cap:
         return Violation(
             kind=ViolationKind.CREDIT_CAP_EXCEEDED,
@@ -110,14 +115,26 @@ def verify(plan: Plan, *, credit_cap: int = DEFAULT_CREDIT_CAP,
                 )
             ]
 
+    if ViolationKind.TERM_ORDER_UNRESOLVED not in skip_checks and not ordered_terms(plan):
+        return [Violation(kind=ViolationKind.TERM_ORDER_UNRESOLVED, semester="",
+            detail="Provide explicit Spring, Summer, or Fall years in strictly increasing order; "
+                   "repeated, reversed, or unsupported terms require review.")]
+
     for block in plan.blocks:
         # `snapshot` freezes the completed-set at the *start* of this semester.
         # Prereq checks read from `snapshot`, not from `taken`, so two courses
-        # listed in the same term cannot unlock each other — students cannot
-        # complete a co-listed prereq mid-term to satisfy a peer course.
+        # listed in the same term cannot satisfy each other's HARD prerequisites.
+        # Co-requisites use the feasible concurrent subset separately.
         snapshot = list(taken)
+        candidates = {c.upper() for c in block.courses if c.upper() not in taken
+                      and db.course_exists(c) and prolog_bridge.in_program(c, plan.program)}
+        feasible = (prolog_bridge.eligible_term(snapshot, candidates, plan.program)
+                    if ViolationKind.PREREQ_MISSING not in skip_checks else candidates)
+        seen_in_block: set[str] = set()
         for course in block.courses:
             course = course.upper()
+            duplicate = _check_duplicate(course, taken | seen_in_block, block.semester)
+            seen_in_block.add(course)
 
             if ViolationKind.UNKNOWN_COURSE not in skip_checks:
                 if v := _check_unknown_course(course):
@@ -126,8 +143,8 @@ def verify(plan: Plan, *, credit_cap: int = DEFAULT_CREDIT_CAP,
                     continue  # downstream checks meaningless if course unknown
 
             if ViolationKind.DUPLICATE_OF_COMPLETED not in skip_checks:
-                if v := _check_duplicate(course, taken, block.semester):
-                    violations.append(v)
+                if duplicate:
+                    violations.append(duplicate)
                     continue
 
             if ViolationKind.PROGRAM_REQUIREMENT_UNMET not in skip_checks:
@@ -136,7 +153,8 @@ def verify(plan: Plan, *, credit_cap: int = DEFAULT_CREDIT_CAP,
                     continue
 
             if ViolationKind.PREREQ_MISSING not in skip_checks:
-                if v := _check_prereq(course, snapshot, plan.program, block.semester):
+                if v := _check_prereq(course, snapshot, plan.program, block.semester,
+                                      concurrent=list(feasible - {course})):
                     violations.append(v)
 
         # 2) per-block checks

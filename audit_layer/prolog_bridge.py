@@ -12,6 +12,7 @@ from __future__ import annotations
 import os, re, subprocess
 from functools import lru_cache
 from pathlib import Path
+from .errors import AuditUnavailable
 
 PROLOG_KB_DIR = Path(__file__).resolve().parent.parent / "prolog_kb"
 RULES_LOADER = PROLOG_KB_DIR / "rules_loader.pl"
@@ -20,8 +21,15 @@ _COURSE_RX = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _PROG_RX = re.compile(r"[A-Za-z0-9_]+")
 
 
-class PrologError(RuntimeError):
+class PrologError(AuditUnavailable):
     """Raised when SWI-Prolog reports a load or query error."""
+
+
+def _boolean_reply(out: str) -> bool:
+    value = out.strip()
+    if value not in {"yes", "no"}:
+        raise PrologError("Unexpected response to a Boolean eligibility query")
+    return value == "yes"
 
 
 def norm_course(s: str) -> str:
@@ -71,11 +79,8 @@ def run_prolog(goal: str, *, capture_trace: bool = False,
             timeout=30,
         )
     except FileNotFoundError as e:
-        # Config error: swipl is not installed or not on PATH. Raised as
-        # RuntimeError (NOT PrologError) so the graceful-degradation catches
-        # in is_eligible/in_program do not silently swallow it -- a missing
-        # swipl means every plan would falsely look uneligible.
-        raise RuntimeError(
+        # Missing infrastructure is not evidence of curricular ineligibility.
+        raise AuditUnavailable(
             "SWI-Prolog (`swipl`) is required by the audit layer but was not "
             "found on PATH. Install it with `sudo apt install swi-prolog` "
             "(Ubuntu) or `brew install swi-prolog` (macOS), or set the PATH "
@@ -85,7 +90,7 @@ def run_prolog(goal: str, *, capture_trace: bool = False,
         # The 30-s timeout is generous for any well-formed prereq query.
         # Hitting it usually means a malformed goal or a degenerate rule
         # file. Surface the goal so the caller can reproduce it manually.
-        raise RuntimeError(
+        raise AuditUnavailable(
             f"swipl query exceeded the 30-s timeout. Goal was:\n  {wrapped}"
         ) from e
     stdout, stderr = proc.stdout.strip(), proc.stderr.strip()
@@ -132,52 +137,68 @@ def prereqs_of(course: str, program: str | None = None) -> list[str]:
 
 
 @lru_cache(maxsize=8192)
-def _is_eligible_cached(taken: frozenset, target: str, prog_atom: str) -> bool:
+def _is_eligible_cached(taken: frozenset, target: str, prog_atom: str,
+                        concurrent: frozenset = frozenset()) -> bool:
     consult = consult_program(prog_atom) if prog_atom else ""
     taken_lit = "[" + ",".join(sorted(taken)) + "]"
+    coreq_lit = "[" + ",".join(sorted(taken | concurrent)) + "]"
     goal = (
         f"({consult}"
         f" (forall(user:prerequisite({target},P),memberchk(P,{taken_lit})),"
         f"  forall(user:one_of_prereqs_fact({target},Opts),"
         f"         (member(Alt,Opts),memberchk(Alt,{taken_lit}))),"
-        f"  forall(user:corequisite({target},Co),memberchk(Co,{taken_lit}))"
+        f"  forall(user:prerequisite_prefix({target},Prefix),"
+        f"         (member(C,{taken_lit}),atom_concat(Prefix,Suffix,C),"
+        f"          atom_number(Suffix,_))),"
+        f"  forall(user:corequisite({target},Co),memberchk(Co,{coreq_lit})),"
+        f"  forall(user:one_of_coreqs_fact({target},Options),"
+        f"         (member(Option,Options),memberchk(Option,{coreq_lit})))"
         f"  -> write(yes); write(no)))"
     )
-    try:
-        out, _ = run_prolog(goal)
-    except PrologError:
-        return False
-    return out.strip() == "yes"
+    out, _ = run_prolog(goal)
+    return _boolean_reply(out)
 
 
-def is_eligible(taken: list[str], target: str, program: str | None = None) -> bool:
-    """Check whether `target` is takeable given completed courses. Optionally
-    consult a program file first so rule scope matches.
+def is_eligible(taken: list[str], target: str, program: str | None = None,
+                *, concurrent: list[str] = ()) -> bool:
+    """Check encoded eligibility in the selected program scope.
 
-    The goal uses `forall + memberchk` rather than full backtracking: we want
-    a yes/no decision, not a witness, so this is both faster and easier to
-    parse. Three conjuncts are required to hold simultaneously: every hard
-    prereq satisfied, at least one alternative for each `one_of_prereqs_fact`
-    satisfied, and every corequisite satisfied. Cached on the *set* of taken
-    courses so re-queries against the same student profile reuse the result.
+    Hard prerequisites, alternative prerequisite groups, and subject-prefix
+    requirements use prior completed courses only. Mandatory and alternative
+    co-requisites may also use the supplied concurrent courses. Cache keys
+    distinguish both sets. This returns a verdict, not an explanation witness.
     """
     return _is_eligible_cached(
         frozenset(norm_course(c) for c in taken),
         norm_course(target),
         norm_prog(program) if program else "",
+        frozenset(norm_course(c) for c in concurrent),
     )
+
+
+def eligible_term(taken, courses, program):
+    """Greatest feasible subset for positive co-requisite relations.
+
+    Hard prerequisites use only prior history. Repeated elimination prevents
+    an ineligible concurrent supporter from unlocking another course.
+    Callers must first exclude unknown, duplicate, and out-of-program courses.
+    """
+    feasible = set(courses)
+    while True:
+        updated = {c for c in feasible if is_eligible(list(taken), c,
+                   program=program, concurrent=list(feasible - {c}))}
+        if updated == feasible:
+            return feasible
+        feasible = updated
 
 
 @lru_cache(maxsize=2048)
 def _in_program_cached(atom: str, prog_atom: str) -> bool:
     consult = consult_program(prog_atom)
-    try:
-        out, _ = run_prolog(
-            f"({consult} (validator_rules:in_program({atom}) -> write(yes); write(no)))"
-        )
-    except PrologError:
-        return False
-    return out.strip() == "yes"
+    out, _ = run_prolog(
+        f"({consult} (validator_rules:in_program({atom}) -> write(yes); write(no)))"
+    )
+    return _boolean_reply(out)
 
 
 def in_program(course: str, program: str | None = None) -> bool:

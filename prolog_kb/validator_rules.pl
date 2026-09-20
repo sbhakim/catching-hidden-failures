@@ -38,6 +38,10 @@ in_program(ID) :- prerequisite(ID,_), !.
 in_program(ID) :- prerequisite(_,ID), !.
 in_program(ID) :- corequisite(ID,_), !.
 in_program(ID) :- corequisite(_,ID).
+% Alternative co-requisites have the same membership treatment as single
+% co-requisite facts; changing the representation must not drop their options.
+in_program(ID) :- user:one_of_coreqs_fact(ID,_), !.
+in_program(ID) :- user:one_of_coreqs_fact(_,Options), memberchk(ID,Options).
 
 % ------------------------------------------------------------------
 %  Filters term:

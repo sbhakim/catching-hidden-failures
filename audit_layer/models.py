@@ -12,7 +12,7 @@ string would let a new failure mode slip through unmeasured.
 """
 from __future__ import annotations
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -25,6 +25,7 @@ class ViolationKind(str, Enum):
     UNKNOWN_COURSE = "unknown_course"
     PROGRAM_REQUIREMENT_UNMET = "program_requirement_unmet"
     NO_PLAN_EXTRACTED = "no_plan_extracted"
+    TERM_ORDER_UNRESOLVED = "term_order_unresolved"
 
 
 class SemesterBlock(BaseModel):
@@ -69,3 +70,11 @@ class AuditResult(BaseModel):
     repair_ops: list[RepairOp] = Field(default_factory=list)
     edit_distance: int = 0
     proof_tree: list[str] = Field(default_factory=list)
+    status: Literal["compliant", "repaired", "failed", "not_repaired", "needs_review"]
+    repair_strategy: Literal["none", "greedy", "scheduled"] = "none"
+    handoff_reasons: list[str] = Field(default_factory=list)
+    unresolved_courses: list[str] = Field(default_factory=list)
+    credit_cap: int
+    repaired_compliant: Optional[bool] = None
+    residual_violations: Optional[list[Violation]] = None
+    timings_ms: dict[str, float] = Field(default_factory=dict)
