@@ -1,229 +1,148 @@
-# Catching Hidden Failures &mdash; Code & Data
+# Auditing LLM-Generated Degree Plans
 
-A model-agnostic, post-generation **audit-and-repair layer** that wraps any LLM-generated
-academic advising plan and returns (i) a verdict over five constraint families plus a
-structural empty-plan guard, (ii) a Prolog-grounded explanation of any violation, and
-(iii) a verifier-checked, minimum-edit repaired plan.
+A post-generation audit and repair layer for academic advising plans. It parses
+semester schedules, checks encoded curricular constraints, and re-verifies repair
+candidates before acceptance. The API and batch runner share the same pipeline.
 
-![Worked example: a generated advising plan, the audit-layer verdict with a Prolog proof, and the verifier-checked repaired plan.](docs/figures/audit_example.png)
+## Repository contents
 
-*A worked example: a Qwen2.5-7B advising plan with a missing-prereq and a
-duplicate course (left), the audit layer's typed verdict and SWI-Prolog
-proof (middle), and the verifier-checked repaired plan (right).*
+- `audit_layer/`: parsing, verification, greedy and scheduling repair, diagnostics,
+  and the FastAPI service.
+- `prolog_kb/`: program-scoped curriculum rules and prerequisite queries.
+- `db/`: PostgreSQL schema and connection helpers.
+- `evaluation/`: benchmark queries, generation and audit runners, and metrics.
+- `scripts/`: service startup and local evaluation commands.
 
-The repository contains the audit layer, the SWI-Prolog knowledge base, the 46-query
-benchmark used in Table 1 / Table 3 (the locked v1 snapshot), the three frozen evaluation
-snapshots that reproduce those tables bit-for-bit, and the leave-one-out verifier
-ablation. A v2 routine extension (`+15` queries, bringing the YAML to 61) is also
-checked in; it follows the same annotation protocol but is not yet covered by the locked
-snapshots. See `evaluation/taxonomy.md` for the category definitions and coverage table.
+Generated responses, results, figures, PDFs, local tests, and working notes are
+excluded from this source release. Replaced local files are not deleted by Git's
+ignore rules.
 
----
+## Setup
 
-## Headline results (3 LLMs &times; 46 queries)
-
-| Model | Flagged plans | Mean violations / plan | Mean edit distance | Repair success |
-|---|---:|---:|---:|---:|
-| Qwen2.5-7B-Instruct  | 100% | 0.65 | 0.60 | 80.4% |
-| Mistral-7B-Instruct-v0.3 | 100% | 0.65 | 0.74 | 65.2% |
-| Gemma-2-9B-IT       | 100% | 0.66 | 0.61 | 63.0% |
-
-Numbers come from `evaluation/audited/*_full.jsonl` (committed to this repo) via
-`evaluation/compute_metrics.py`. They reproduce to three decimals on a fresh checkout
-without re-querying the LLMs.
-
----
-
-## Repository layout
-
-```
-.
-├── audit_layer/        # core contribution: parser, verifier, explainer, repair, API
-├── prolog_kb/          # symbolic KB: program rules + course catalog (see README)
-├── db/                 # Postgres schema and connection helpers
-├── evaluation/         # benchmark queries, runners, metrics, frozen JSONL snapshots
-├── scripts/            # one-command reproduction, service bring-up, smoke test
-├── tests/              # offline pytest suite + end-to-end snapshot regression
-├── docs/design_notes.md
-├── docs/portability.md   # what a second-institution deployment costs (rules, LOC, hours)
-├── .env.example
-├── requirements.txt
-├── CITATION.cff
-└── LICENSE             # MIT
-```
-
----
-
-## Requirements
-
-| Dependency | Version | Notes |
-|---|---|---|
-| Python      | 3.10+   | Pydantic v2, FastAPI 0.110 |
-| SWI-Prolog  | 8.4+    | `swipl` on `$PATH` |
-| PostgreSQL  | 14+     | Schema in `db/schema.sql` |
-| (optional) Ollama | latest | local LLM serving for `evaluation/run_llm.py` |
-| (optional) HuggingFace Transformers | 4.40+ | for `hf:` LLM backends |
-
-The codebase is Linux-only by default (the SWI-Prolog subprocess is invoked via POSIX
-shell).
-
----
-
-## Quickstart
-
-### 1. Clone and create the environment
+Requires Python 3.10+, PostgreSQL 14+, and SWI-Prolog 8.4+ (`swipl` on `PATH`).
+The startup scripts assume Bash and Conda. Model generation additionally requires
+an appropriate local model server or provider credentials.
 
 ```bash
-git clone https://github.com/<user>/NeSy-Advising-Agent.git
-cd NeSy-Advising-Agent
-
-conda create -n nesy python=3.10 -y
+git clone https://github.com/sbhakim/catching-hidden-failures.git
+cd catching-hidden-failures
+conda create -n nesy python=3.11 -y
 conda activate nesy
 pip install -r requirements.txt
-```
-
-### 2. Configure environment variables
-
-```bash
 cp .env.example .env
-$EDITOR .env       # POSTGRES_* and (optionally) ANTHROPIC_API_KEY / OPENAI_API_KEY
-```
-
-### 3. Bring up Postgres and seed the curriculum schema
-
-Any local Postgres instance works (Docker, system service, or managed). Create the
-database and apply the schema:
-
-```bash
+# Edit .env with your database connection and any provider credentials.
 createdb course_advisor
 psql -d course_advisor -f db/schema.sql
 ```
 
-The audit layer expects the curriculum DB used by the paper's evaluation. The schema
-file declares the tables; populating it for an arbitrary institution is out of scope
-for this artifact and is discussed in the paper's *Limitations and Future Directions*.
+The schema contains **no data rows**. Populate `courses` with identifiers and
+recorded credits before auditing. Requests without explicit program/history also
+need student context in `users_students`, `program_offerings`, `user_program`, and
+`user_course`. The generation tool baseline additionally uses `program_course`.
+Use authorized institutional data and keep credentials and student data local.
 
-### 4. Verify the install with the no-LLM smoke test
+A database schema alone cannot reproduce the paper's numerical results. Exact
+replay also requires the corresponding catalog snapshot, saved responses, query
+selection, and evaluation configuration. Those local artifacts are not bundled
+here. New provider responses can differ from historical runs.
 
-```bash
-python scripts/smoke_test.py
-```
-
-This parses three synthetic plans, runs them through the verifier, and prints the
-violations found &mdash; no LLM and no Postgres data are required for the parser/verifier
-path.
-
-### 5. Reproduce the paper's headline numbers from the frozen snapshots
+## Run the service
 
 ```bash
-python evaluation/compute_metrics.py --inputs \
-    evaluation/audited/qwen2_5_7b_full.jsonl \
-    evaluation/audited/hf_mistral_7b_v03_full.jsonl \
-    evaluation/audited/hf_gemma_2_9b_it_full.jsonl \
-    --by_tag
+uvicorn audit_layer.api:app --host 127.0.0.1 --port 8020
 ```
 
-Output matches Table 1 of the paper to three decimals. Runs in ~20 seconds.
-
-### 6. Reproduce the leave-one-out ablation (Table 3)
-
-```bash
-python evaluation/run_ablations.py --inputs \
-    evaluation/audited/qwen2_5_7b_full.jsonl \
-    evaluation/audited/hf_mistral_7b_v03_full.jsonl \
-    evaluation/audited/hf_gemma_2_9b_it_full.jsonl \
-    --out evaluation/metrics/ablations_v0.json
-```
-
-Snapshot is also pre-committed at `evaluation/metrics/ablations_v0.{json,md}`.
-
----
-
-## Full reproduction from scratch
-
-To regenerate raw plans from each LLM and rebuild every output file, including the
-`runs/` and `audited/` JSONL snapshots:
-
-```bash
-# starts/ensures Postgres, Ollama, swipl are reachable, then runs every stage
-bash scripts/run_full_eval.sh
-
-# force re-generation even if outputs exist
-FORCE=1 bash scripts/run_full_eval.sh
-```
-
-The script is **idempotent**: stages are skipped if their output file already exists.
-Override the conda environment with `CONDA_ENV=<name>` and the conda root with
-`CONDA_BASE=<path>`.
-
-For Ollama:
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen2.5:7b-instruct
-ollama serve &
-```
-
-For HuggingFace backends (`hf:mistral-7b-instruct-v0.3`, `hf:gemma-2-9b-it`), the model
-weights are downloaded by `evaluation/run_llm.py` on first use; expect ~30 GB of disk.
-
----
-
-## Auditing a single plan over HTTP
-
-Start the audit-layer API:
-
-```bash
-./scripts/run_services.sh                # foreground (uvicorn --reload)
-# or
-./scripts/run_services.sh --bg           # background, logs in /tmp/audit_api.log
-```
-
-Then audit a plan:
+Example request, after loading a compatible catalog:
 
 ```bash
 curl -X POST http://127.0.0.1:8020/audit \
   -H 'Content-Type: application/json' \
   -d '{
-        "student_id": 4942915,
-        "plan": "- **Fall 2026**: COP_4338, CDA_3102\n- **Spring 2027**: COP_3530",
-        "source": "manual"
-      }'
+    "student_id": 1,
+    "program": "CS-BS",
+    "completed": ["COP_2210", "MAD_2104", "COT_3100"],
+    "plan": "- **Fall 2026**: COP_3530\n- **Spring 2027**: COP_4534",
+    "source": "manual",
+    "credit_cap": 18
+  }'
 ```
 
-The response contains the parsed `Plan`, the list of `Violation`s grouped by family,
-the prerequisite-chain explanations, and the repaired plan with its edit list.
+`compliant` describes the original plan; `repaired_compliant` and
+`residual_violations` describe the candidate. `repair_strategy` identifies the
+selected method, and `unresolved_courses` records omitted original courses.
+Only `compliant` and `repaired` statuses pass the encoded checks.
 
----
+Nonempty plans require explicit, strictly increasing Spring/Summer/Fall years
+(Autumn is accepted as Fall). Missing years or unsupported/repeated/reversed terms
+produce `needs_review`, with no repair candidate. Empty extraction is a failure.
+Missing or negative credits and unavailable Prolog checks stop certification;
+recorded zero-credit courses remain valid. These unavailable checks produce HTTP
+503 with `audit_unavailable`. Other infrastructure errors can also stop requests.
 
-## What this codebase does *not* claim
+Hard prerequisites require prior completion; co-requisites may use feasible
+concurrent courses. Repair never invents courses or extends the original horizon.
+Acceptance does not establish complete degree fulfillment, offering availability,
+student preference satisfaction, or an optimal edit set. Prerequisite-chain
+context is supplementary, not a complete explanation certificate.
 
-- It is **not** a curriculum DB for an arbitrary institution. The schema is provided;
-  populating it for a specific catalog is the deployer's responsibility. See
-  `docs/portability.md` for what a second-institution deployment actually costs
-  (rule LOC, author-hours per program, what ports as-is vs. needs authoring).
-- It is **not** a benchmark release. The 46-query suite (v1) is the seed used in the
-  paper. The current YAML adds a v2 routine extension (+15 queries) so the suite is now
-  35 routine + 26 probe = 61 queries; expansion to a multi-institution benchmark is left
-  as future work (see the paper's *Limitations* section).
-- It is **not** a new advising agent. The contribution is the post-generation
-  **audit layer** that wraps any plan generator; the symbolic curriculum rules in
-  `prolog_kb/flowchart_rules/` are pre-existing institutional rules.
+## Generate and audit local responses
 
----
+`evaluation/queries.yaml` contains the original 46 author-constructed queries and
+15 additional routine queries. `run_llm_fixture.py --v1-only` selects the original
+suite and supplies the three seeded benchmark profiles; it is an evaluation
+input adapter, not a local test fixture. Without this flag it runs all 61 queries.
+Category definitions are documented in the YAML header. The suite has not been
+independently validated by academic advisors.
 
-## Contact
+For a local Ollama model, pull and serve `qwen2.5:7b` first. Then:
 
-For questions or follow-ups, reach out at
-**`safayat`** ‹dot› **`b`** ‹dot› **`hakim`** ‹at› **`gmail`** ‹dot› **`com`**
+```bash
+python evaluation/run_llm_fixture.py --queries evaluation/queries.yaml \
+  --llm ollama:qwen2.5:7b --v1-only --out evaluation/runs/qwen.jsonl
+python evaluation/run_audit.py --in evaluation/runs/qwen.jsonl \
+  --out evaluation/audited/qwen.jsonl --credit-cap 18
+python evaluation/compute_metrics.py --inputs evaluation/audited/qwen.jsonl --by_tag
+```
 
-## License
+`run_llm.py` resolves profiles from PostgreSQL instead. Run either generator with
+`--help` to see registered model identifiers. Hugging Face generation needs
+separately installed `torch`, `transformers`, and model access where required.
+Provider-backed generation requires the relevant API key and incurs provider fees.
+No API calls run during installation.
 
-MIT &mdash; see [`LICENSE`](LICENSE).
+`run_tool_calling.py` provides the structured tool-access baseline. The general
+generation runners use their own prompts and decoding settings; they are not the
+separate grounded DeepSeek V4 Flash (0731) or GLM 5.3 experiment protocols.
 
-## Provenance
+Metrics re-verify candidates against the configured database and rules, using
+the recorded credit cap. They require the same catalog/rule version as the audit.
+Check successful process completion and expected response counts: unavailable
+checks abort batch processing and can leave partial output files. The convenience
+script `scripts/run_full_eval.sh` runs the original three-generator workflow;
+it does not reproduce every experiment in the revised manuscript.
 
-Original to this work: the audit layer (`audit_layer/`, `evaluation/`,
-`tests/`, scripts). Reused as input: the curriculum schema and
-program-flowchart rules in `prolog_kb/`
-([Quincoso&nbsp;Lugones et&nbsp;al., SAC&nbsp;'26](https://arxiv.org/abs/2602.17999)).
+## Curriculum maintenance
+
+Version the catalog, rule sources, completed-course histories, and evaluation
+configuration together. Restart the service after changes because lookups are
+cached for the process lifetime. A curriculum specialist should resolve policy
+ambiguities; an engineer should map identifiers and check affected rule consumers.
+
+The focal CS-BS rules preserve the [April 2023 FIU flowchart](https://users.cs.fiu.edu/~prabakar/upc/flowcharts/backup/2024-03-22_backup/CS-BS.pdf).
+They include alternative co-requisites and prior MAC-and-COP requirements for
+COT3100. The source's syllabus-dependent COT3510 prerequisite remains unresolved.
+This is not a statement of current catalog coverage. Other institutions may need
+changes for identifier formats, Boolean requirements, transfer credit, exceptions,
+term offerings, and full degree requirements. Multi-catalog-year selection and
+advisor-facing effectiveness have not been established.
+
+## Provenance and citation
+
+The audit layer and evaluation runners extend the curriculum-grounded foundation
+in [Aurora (SAC 2026)](https://doi.org/10.1145/3748522.3779850). The schema and program
+rules originate in that work; CS-BS rules and their consumers have been revised
+as described above. See `CITATION.cff` for software attribution.
+
+## License and contact
+
+MIT; see [LICENSE](LICENSE). Contact: safayat.b.hakim@gmail.com.

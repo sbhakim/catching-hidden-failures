@@ -5,8 +5,7 @@
 #
 # Pinning policy: every package is bracketed by the versions we have
 # actually tested (lower bound) and the next major release (upper bound).
-# This keeps the frozen evaluation snapshots reproducible while still
-# accepting security patches. Bump the upper bound after testing.
+# Record exact resolved versions with each experiment.
 
 fastapi==0.110.3
 uvicorn[standard]==0.30.0
@@ -14,12 +13,8 @@ pydantic>=2.5,<3
 httpx>=0.27,<0.30
 python-multipart>=0.0.20,<0.1
 pyyaml>=6.0,<7
+python-dotenv>=1.0,<2
 psycopg2-binary>=2.9,<3
-
-# Offline evaluation analyses and manuscript figures
-numpy>=1.24,<3
-matplotlib>=3.7,<4
-scikit-learn>=1.3,<2
 
 # LLM client SDKs for evaluation/run_llm.py (optional — only needed for the
 # specific provider you evaluate against)
