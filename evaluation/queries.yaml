@@ -3,13 +3,12 @@
 # Advising benchmark.
 #
 # Two versions live in this file:
-#   - v1 (paper snapshot, 46 queries): the suite reported in Table 1
-#     and Table 3 of the paper. Audited JSONLs in evaluation/audited/
-#     cover exactly these 46 records and reproduce bit-for-bit. The v1
-#     entries appear first, ordered by category section header.
+#   - v1 (46 queries): the original suite. Entries appear first,
+#     ordered by category section header. Generated responses are local
+#     artifacts and are not distributed in this source release.
 #   - v2 routine extension (15 queries): appended at the end of the
 #     file under the "ROUTINE v2 EXTENSION" banner. These are NOT in
-#     the locked snapshots; running `run_llm.py` regenerates plans for
+#     the original suite; running `run_llm.py` generates plans for
 #     all 61 queries.
 #
 # Counts:
@@ -30,7 +29,8 @@
 #                       probe-transfer-credit, probe-multi-program,
 #                       probe-out-of-scope, probe-conflict,
 #                       probe-what-if, probe-optimization
-#                     See `taxonomy.md` for full definitions.
+#                     routine-* denotes ordinary advising tasks; probe-*
+#                     denotes the named ambiguity or constraint stressor.
 #   expected_kind   — what the LLM should produce (single_term | roadmap |
 #                     refusal | clarification)
 #

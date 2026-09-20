@@ -2,10 +2,10 @@
 # One-command reproduction of the three-model audit pipeline.
 #
 # Stages, in order:
-#   1. Generate raw plans for each model on the 46-query suite.
+#   1. Generate raw plans for each model on the original 46-query suite.
 #   2. Audit each runs/*.jsonl into audited/*.jsonl (parse + verify + repair + explain).
 #   3. Compute headline metrics across all three audited files.
-#   4. Run the leave-one-out verifier ablation.
+# Outputs are local; no published result snapshots are bundled.
 #
 # Idempotent: stages 1-2 skip a model if its output already exists.
 # Override with FORCE=1 to regenerate.
@@ -58,7 +58,7 @@ for entry in "${MODELS[@]}"; do
         echo "[skip-gen] $stem  ($raw exists)"
     else
         echo "[gen] $llm -> $raw"
-        python evaluation/run_llm.py --queries evaluation/queries.yaml \
+        python evaluation/run_llm_fixture.py --v1-only --queries evaluation/queries.yaml \
                                      --llm "$llm" --out "$raw"
     fi
 
@@ -78,12 +78,4 @@ python evaluation/compute_metrics.py --inputs \
     evaluation/audited/hf_gemma_2_9b_it_full.jsonl \
     --by_tag
 
-# ── stage 4: leave-one-out ablation ───────────────────────────────
-echo "=== Leave-one-out ablation ==="
-python evaluation/run_ablations.py --inputs \
-    evaluation/audited/qwen2_5_7b_full.jsonl \
-    evaluation/audited/hf_mistral_7b_v03_full.jsonl \
-    evaluation/audited/hf_gemma_2_9b_it_full.jsonl \
-    --out evaluation/metrics/ablations_v0.json
-
-echo "Done. Snapshots in evaluation/metrics/"
+echo 'Done. Review local output counts and exit status before reporting metrics.'

@@ -74,10 +74,8 @@ def run_deepseek_api(query: str, program: str, completed: list[str], model: str)
     """DeepSeek's hosted API at api.deepseek.com is OpenAI-compatible.
 
     We reuse the OpenAI SDK with a custom ``base_url`` and the
-    ``DEEPSEEK_API_KEY`` env var. ``deepseek-chat`` (V4 Flash non-thinking)
-    is the cheap default; ``deepseek-reasoner`` activates the thinking
-    mode and produces ``<think>...</think>`` blocks that our parser
-    already strips before plan extraction.
+    ``DEEPSEEK_API_KEY`` env var. Provider aliases are not immutable model
+    versions; record the returned model and configuration for each run.
     """
     import os
     from openai import OpenAI
