@@ -4,18 +4,31 @@ A post-generation audit and repair layer for academic advising plans. It parses
 semester schedules, checks encoded curricular constraints, and re-verifies repair
 candidates before acceptance. The API and batch runner share the same pipeline.
 
+## How it works
+
+1. Parse a structured or text plan into semester blocks, preserving repeated courses.
+2. Check catalog validity, program membership, duplicates, prerequisite/co-requisite
+   timing, and credit limits, plus empty-plan and semester-order guards.
+3. Apply greedy repair and construct a scheduling candidate within the original horizon.
+4. Re-verify both candidates with the same checker. Prefer a passing scheduling
+   candidate when greedy repair fails, or when it retains more proposed courses.
+5. Return the verdict, edits, omitted courses, and any issues requiring review.
+
+Already compliant plans are returned without repair. Ambiguous semester ordering
+requires clarification before repair can proceed.
+
 ## Repository contents
 
-- `audit_layer/`: parsing, verification, greedy and scheduling repair, diagnostics,
+- [`audit_layer/`](audit_layer/): parsing, verification, greedy and scheduling repair, diagnostics,
   and the FastAPI service.
-- `prolog_kb/`: program-scoped curriculum rules and prerequisite queries.
-- `db/`: PostgreSQL schema and connection helpers.
-- `evaluation/`: benchmark queries, generation and audit runners, and metrics.
-- `scripts/`: service startup and local evaluation commands.
+- [`prolog_kb/`](prolog_kb/): program-scoped curriculum rules and prerequisite queries.
+- [`db/`](db/): PostgreSQL schema and connection helpers.
+- [`evaluation/`](evaluation/): benchmark queries, generation and audit runners, and metrics.
+- [`scripts/`](scripts/): service startup and local evaluation commands.
 
 Generated responses, results, figures, PDFs, local tests, and working notes are
-excluded from this source release. Replaced local files are not deleted by Git's
-ignore rules.
+excluded from this source release. Generated files remain local under the rules in
+[`.gitignore`](.gitignore).
 
 ## Setup
 
@@ -34,6 +47,11 @@ cp .env.example .env
 createdb course_advisor
 psql -d course_advisor -f db/schema.sql
 ```
+
+Run these commands from the repository root. The Python service reads `.env`;
+`createdb` and `psql` use PostgreSQL connection options or `PG*` environment
+variables, not the application's `POSTGRES_*` names. Connect to the same database
+and role configured in `.env`, using `-h`, `-p`, and `-U` where needed.
 
 The schema contains **no data rows**. Populate `courses` with identifiers and
 recorded credits before auditing. Requests without explicit program/history also
@@ -67,6 +85,22 @@ curl -X POST http://127.0.0.1:8020/audit \
   }'
 ```
 
+Interactive API documentation is available at `http://127.0.0.1:8020/docs`.
+The `/parse` endpoint accepts the same request shape and returns the parsed plan
+without curricular verification. Supplying both `program` and `completed` avoids
+a student-record lookup; `/audit` still needs the course catalog.
+
+| Status | Meaning |
+|---|---|
+| `compliant` | The original plan passes the encoded checks. |
+| `repaired` | A repaired candidate passes the encoded checks. |
+| `failed` | Repair was attempted but residual violations remain. |
+| `not_repaired` | Violations were found and the request disabled repair. |
+| `needs_review` | Semester ordering needs clarification; no candidate is returned. |
+
+Set `"repair": false` to check a plan without editing it. An HTTP 503
+`audit_unavailable` response is a service error, not one of these plan statuses.
+
 `compliant` describes the original plan; `repaired_compliant` and
 `residual_violations` describe the candidate. `repair_strategy` identifies the
 selected method, and `unresolved_courses` records omitted original courses.
@@ -94,6 +128,10 @@ input adapter, not a local test fixture. Without this flag it runs all 61 querie
 Category definitions are documented in the YAML header. The suite has not been
 independently validated by academic advisors.
 
+The query file's `expected_kind` labels describe intended response types; they
+are not independently verified reference plans. Preserve query IDs and record
+which subset was used when comparing runs.
+
 For a local Ollama model, pull and serve `qwen2.5:7b` first. Then:
 
 ```bash
@@ -108,7 +146,9 @@ python evaluation/compute_metrics.py --inputs evaluation/audited/qwen.jsonl --by
 `--help` to see registered model identifiers. Hugging Face generation needs
 separately installed `torch`, `transformers`, and model access where required.
 Provider-backed generation requires the relevant API key and incurs provider fees.
-No API calls run during installation.
+The runners read `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`,
+or `DEEPSEEK_API_KEY` for the selected provider. Add only the keys needed to your
+local `.env`; keep them out of source files. No API calls run during installation.
 
 `run_tool_calling.py` provides the structured tool-access baseline. The general
 generation runners use their own prompts and decoding settings; they are not the
@@ -120,6 +160,13 @@ Check successful process completion and expected response counts: unavailable
 checks abort batch processing and can leave partial output files. The convenience
 script `scripts/run_full_eval.sh` runs the original three-generator workflow;
 it does not reproduce every experiment in the revised manuscript.
+
+The Makefile also provides:
+
+```bash
+make serve
+make metrics INPUTS="evaluation/audited/qwen.jsonl"
+```
 
 ## Curriculum maintenance
 
@@ -141,7 +188,7 @@ advisor-facing effectiveness have not been established.
 The audit layer and evaluation runners extend the curriculum-grounded foundation
 in [Aurora (SAC 2026)](https://doi.org/10.1145/3748522.3779850). The schema and program
 rules originate in that work; CS-BS rules and their consumers have been revised
-as described above. See `CITATION.cff` for software attribution.
+as described above. See [`CITATION.cff`](CITATION.cff) for software attribution.
 
 ## License and contact
 
