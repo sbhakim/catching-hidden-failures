@@ -35,10 +35,11 @@ _SEMESTER_RX = re.compile(
     r"\b(Fall|Spring|Summer|Autumn|Winter)\s*(\d{4})?\b", re.I
 )
 # Markdown bullet headers like "- **Fall 2026**: COP_3530, MAD_2104".
-# We accept "*", "-", or "•" bullet, optional bold markers, optional year,
+# We accept "*", "-", or "•" bullet, emphasis markers, optional year,
 # and either ":" or "-" as the separator before the course list.
 _BULLET_HEADER_RX = re.compile(
-    r"^\s*[-\*•]\s*\*\*?(Fall|Spring|Summer|Autumn|Winter)\s*(\d{4})?\*\*?\s*[:\-]?\s*(.*)$",
+    r"^[ \t]*[-*•][ \t]+\*{1,2}(Fall|Spring|Summer|Autumn|Winter)\b"
+    r"[ \t]*(\d{4})?\*{1,2}[ \t]*[:\-]?[ \t]*([^\r\n]*)$",
     re.I | re.M,
 )
 
@@ -55,15 +56,21 @@ def parse_markdown(text: str, student_id: int, program: str,
                    completed: list[str], source: str = "unknown") -> Plan:
     """Parse markdown-style plans like '- **Fall 2026**: COP_3530, MAD_2104'."""
     blocks: list[SemesterBlock] = []
-    seen_courses: set[str] = set()
-    for m in _BULLET_HEADER_RX.finditer(text):
+    headers = list(_BULLET_HEADER_RX.finditer(text))
+    for index, m in enumerate(headers):
         sem_name, year, body = m.group(1), m.group(2), m.group(3)
         sem_label = f"{sem_name.title()} {year}" if year else sem_name.title()
-        courses = []
-        for cid in extract_courses(body):
-            if cid not in seen_courses:
-                seen_courses.add(cid)
-                courses.append(cid)
+        # Preserve occurrences: deduplication is a verifier/repair decision,
+        # not a silent transformation of the raw plan.
+        courses = extract_courses(body)
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
+        for line in text[m.end():end].splitlines():
+            if not line.strip():
+                continue
+            if re.match(r"^[ \t]+[-*•][ \t]+", line):
+                courses.extend(extract_courses(line))
+            else:
+                break  # Do not consume trailing commentary as course bullets.
         blocks.append(SemesterBlock(semester=sem_label, courses=courses))
     return Plan(
         student_id=student_id,
@@ -110,7 +117,7 @@ def parse_free_text(text: str, student_id: int, program: str,
             f"{m.group(1).title()} {m.group(2)}" if m.group(2)
             else m.group(1).title()
         )
-        courses = list(dict.fromkeys(extract_courses(text[start:end])))
+        courses = extract_courses(text[start:end])
         if courses:
             blocks.append(SemesterBlock(semester=sem_label, courses=courses))
     return Plan(
